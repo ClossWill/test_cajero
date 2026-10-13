@@ -1,0 +1,1230 @@
+# LogicalCode	Description	RecommendedSolution  (fuente: CRM9250N LogicalCode.xls del SDK de GRG, sin traducir)
+25101	Get no information about note when validating	Do noting
+25110	Other warning	Do noting
+25111	input slot fail to separate notes	Prompt customer to take away the note and place it properly
+25112	Note is improperly placed at slot	Prompt customer to take away the note and place it properly
+25113	No note is in input slot	Prompt no notes
+25114	No note in exit slot	Prompt no notes
+25115	Number of notes in input slot reaches the limit	Execute deposit or cancel deposit
+25116	Extra-narrow note is detected at input slot	Prompt customer to take away the note and place it properly
+25117	Extra-skew note is detected at input slot	Prompt customer to take away the note and place it properly
+25118	Note with holes is detected at input slot	Prompt customer to take away the note and place it properly
+25119	Number of continuously rejected notes exceeds the limit while counting	Execute deposit or cancel deposit
+25120	Number of deposited notes exceeds the limit while counting	Execute deposit or cancel deposit
+25121	Total number of notes rejected exceeds preset number	Execute deposit or cancel deposit
+25122	Notes rejected during counting	Upper layer handles the abnormality depending on business process
+25123	Notes at slot upon end of command	Upper layer handles the abnormality depending on business process
+25124	Counting again	Banks bidding requirements
+25125	Withdraw again	Banks bidding requirements
+25161	Number of notes in escrow reaches limit	Execute deposit or cancel deposit
+25162	Escrow tape is full	Execute or cancel the deposit
+25211	RC1 null	Update cassette status and stop dispensing note from the cassette
+25212	RC2 null	Update cassette status and stop dispensing note from the cassette
+25213	RC3 null	Update cassette status and stop dispensing note from the cassette
+25214	RC4 null	Update cassette status and stop dispensing note from the cassette
+25215	ATC null	Update cassette status and stop dispensing note from the cassette
+25216	RC1 full	Update cassette status
+25217	RC2 full	Update cassette status
+25218	RC3 full	Update cassette status
+25219	RC4 full	Update cassette status
+25220	ATC full	Update cassette status
+25221	AC is almost full	Update cassette status
+25222	RC1 is almost full	Update cassette status
+25223	RC2 is almost full	Update cassette status
+25224	RC3 is almost full	Update cassette status
+25225	RC4 is almost full	Update cassette status
+25226	ATC is almost full	Update cassette status
+25227	AC1 full	Update cassette status
+25228	AC2 is full	Update the cassette status
+25229	RC5 is full	Update the cassette status
+25230	RC6 is full	Update the cassette status
+25231	Abnormal LRB detected	Ignore it without processing or record in logs
+25232	RC7 is full	Update the cassette status
+25233	RC8 is full	Update the cassette status
+25234	RC9 is full	Update the cassette status
+25235	RC10 is full	Update the cassette status
+25236	AC2 is to be full	Update the cassette status
+25237	RC5 is to be full	Update the cassette status
+25238	RC6 is to be full	Update the cassette status
+25239	RC7 is to be full	Update the cassette status
+25240	RC8 is to be full	Update the cassette status
+25241	Audit process, obtaining OCR information by upper layer times out	Perform initialization and restart audit
+25242	At the time of the audit, the denominations of the notes issued from the RC boxes were not consistent.	Discontinue audit.
+25243	RC1 continuous refusals to excess notes.	Discontinue audit.
+25244	RC2 continuously rejected too many notes.	Discontinue audit.
+25245	RC3 continuously rejected too many notes.	Discontinue audit.
+25246	ATC continuously rejected too many notes.	Discontinue audit.
+25247	RC9 is to be full	Update the cassette status
+25248	RC10 is to be full	Update the cassette status
+25249	ATC continuously refuses too many notes	Stop audit
+25250	RC5 continuously refuses too many notes	Stop audit
+25251	RC6 continuously refuses too many notes	Stop audit
+25252	RC7 continuously refuses too many notes	Stop audit
+25253	RC8 continuously refuses too many notes	Stop audit
+25254	RC9 continuously refuses too many notes	Stop audit
+25255	RC10 continuously refuses too many notes	Stop audit
+25256	Number of notes consecutively rejected by RC11 is over the limit	Stop audit
+25257	Number of notes consecutively rejected by RC12 is over the limit	Stop audit
+25258	Number of notes consecutively rejected by RC13 is over the limit	Stop audit
+25259	Number of notes consecutively rejected by RC14 is over the limit	Stop audit
+25260	Number of notes consecutively rejected by RC15 is over the limit	Stop audit
+25261	Number of notes consecutively rejected by RC16 is over the limit	Stop audit
+25262	RC5 is empty	Update the cassette status, and take no notes from this cassette further
+25263	RC6 is empty	Update the cassette status, and take no notes from this cassette further
+25264	RC7 is empty	Update the cassette status, and take no notes from this cassette further
+25265	RC8 is empty	Update the cassette status, and take no notes from this cassette further
+25266	RC9 is empty	Update the cassette status, and take no notes from this cassette further
+25267	RC10 is empty	Update the cassette status, and take no notes from this cassette further
+25268	RC11 is empty	Update the cassette status, and take no notes from this cassette further
+25269	RC12 is empty	Update the cassette status, and take no notes from this cassette further
+25270	RC13 is empty	Update the cassette status, and take no notes from this cassette further
+25271	RC14 is empty	Update the cassette status, and take no notes from this cassette further
+25272	RC15 is empty	Update the cassette status, and take no notes from this cassette further
+25273	RC16 is empty	Update the cassette status, and take no notes from this cassette further
+25274	RC11 is full	Update the cassette status
+25275	RC12 is full	Update the cassette status
+25276	RC13 is full	Update the cassette status
+25277	RC14 is full	Update the cassette status
+25278	RC15 is full	Update the cassette status
+25279	RC16 is full	Update the cassette status
+25280	RC11 is to be full	Update the cassette status
+25281	RC12 is to be full	Update the cassette status
+25282	RC13 is to be full	Update the cassette status
+25283	RC14 is to be full	Update the cassette status
+25284	RC15 is to be full	Update the cassette status
+25285	RC16 is to be full	Update the cassette status
+25301	Error of command sequence	Correct calling process
+25302	Parameter error	Correct input parameter
+25303	Fail to allocate memory	Software problem, contact supplier
+25400	Fail to communicate with NV board	Check for abnormal connection to communication cable of NV or abnormality of communication configuration
+25401	Fail to recognize the serial number image	Software problem, contact supplier
+25402	Fail to save serial number image	Software problem, contact supplier
+25403	Fail to delete image file	Retry
+25404	Fail to load OCR dynamic library	Software problem, contact supplier
+25405	Data retrieval  failed	Software problem, contact supplier
+25406	Fail to operate data library	Software problem, contact supplier
+25407	Fail to operate the SQL file	Software problem, contact supplier
+25408	Database backup is in progress, please retry later (the error code only involves with the retrieval related to sequence number)	Retry
+25409	RC11 pressure plate reset is timed out	Shield the invalid cassette and then initialize unit
+25410	RC12 pressure plate reset is timed out	Shield the invalid cassette and then initialize unit
+25411	RC13 pressure plate reset is timed out	Shield the invalid cassette and then initialize unit
+25412	RC14 pressure plate reset is timed out	Shield the invalid cassette and then initialize unit
+25413	RC15 pressure plate reset is timed out	Shield the invalid cassette and then initialize unit
+25414	RC16 pressure plate reset is timed out	Shield the invalid cassette and then initialize unit
+25415	RC11 pressure plate raising is timed out	Shield the invalid cassette and then initialize unit
+25416	RC12 pressure plate raising is timed out	Shield the invalid cassette and then initialize unit
+25417	RC13 pressure plate raising is timed out	Shield the invalid cassette and then initialize unit
+25418	RC14 pressure plate raising is timed out	Shield the invalid cassette and then initialize unit
+25419	RC15 pressure plate raising is timed out	Shield the invalid cassette and then initialize unit
+25420	RC16 pressure plate raising is timed out	Shield the invalid cassette and then initialize unit
+25421	RC11 pressure plate decline failure	Shield the invalid cassette and then initialize unit
+25422	RC12 pressure plate decline failure	Shield the invalid cassette and then initialize unit
+25423	RC13 pressure plate decline failure	Shield the invalid cassette and then initialize unit
+25424	RC14 pressure plate decline failure	Shield the invalid cassette and then initialize unit
+25425	RC15 pressure plate decline failure	Shield the invalid cassette and then initialize unit
+25426	RC16 pressure plate decline failure	Shield the invalid cassette and then initialize unit
+25427	RC11 motor error	Shield the invalid cassette and then initialize unit
+25428	RC12 motor error	Shield the invalid cassette and then initialize unit
+25429	RC13 motor error	Shield the invalid cassette and then initialize unit
+25430	RC14 motor error	Shield the invalid cassette and then initialize unit
+25431	RC15 motor error	Shield the invalid cassette and then initialize unit
+25432	RC16 motor error	Shield the invalid cassette and then initialize unit
+25433	RC11 sheet roller reset failure	Shield the invalid cassette and then initialize unit
+25434	RC12 sheet roller reset failure	Shield the invalid cassette and then initialize unit
+25435	RC13 sheet roller reset failure	Shield the invalid cassette and then initialize unit
+25436	RC14 sheet roller reset failure	Shield the invalid cassette and then initialize unit
+25437	RC15 sheet roller reset failure	Shield the invalid cassette and then initialize unit
+25438	RC16 sheet roller reset failure	Shield the invalid cassette and then initialize unit
+25439	RC11 fail to separate notes	Shield the invalid cassette and then initialize unit
+25440	RC12 fail to separate notes	Shield the invalid cassette and then initialize unit
+25441	RC13 fail to separate notes	Shield the invalid cassette and then initialize unit
+25442	RC14 fail to separate notes	Shield the invalid cassette and then initialize unit
+25443	RC15 fail to separate notes	Shield the invalid cassette and then initialize unit
+25444	RC16 fail to separate notes	Shield the invalid cassette and then initialize unit
+25445	RC11 does not exist	Shield the invalid cassette and then initialize unit
+25446	RC12 does not exist	Shield the invalid cassette and then initialize unit
+25447	RC13 does not exist	Shield the invalid cassette and then initialize unit
+25448	RC14 does not exist	Shield the invalid cassette and then initialize unit
+25449	RC15 does not exist	Shield the invalid cassette and then initialize unit
+25450	RC16 does not exist	Shield the invalid cassette and then initialize unit
+25451	RC11 is full	Shield the invalid cassette and then initialize unit
+25452	RC12 is full	Shield the invalid cassette and then initialize unit
+25453	RC13 is full	Shield the invalid cassette and then initialize unit
+25454	RC14 is full	Shield the invalid cassette and then initialize unit
+25455	RC15 is full	Shield the invalid cassette and then initialize unit
+25456	RC16 is full	Shield the invalid cassette and then initialize unit
+25457	RC11 is empty, but the withdrawn notes do not reach the specified quantity	Initialize the module, and select other cassette to dispense the notes
+25458	RC12 is empty, but the withdrawn notes do not reach the specified quantity	Initialize the module, and select other cassette to dispense the notes
+25459	RC13 is empty, but the withdrawn notes do not reach the specified quantity	Initialize the module, and select other cassette to dispense the notes
+25460	RC14 is empty, but the withdrawn notes do not reach the specified quantity	Initialize the module, and select other cassette to dispense the notes
+25461	RC15 is empty, but the withdrawn notes do not reach the specified quantity	Initialize the module, and select other cassette to dispense the notes
+25462	RC16 is empty, but the withdrawn notes do not reach the specified quantity	Initialize the module, and select other cassette to dispense the notes
+25463	Number of notes consecutively rejected by RC11 is over the limit	Initialize the module
+25464	Number of notes consecutively rejected by RC12 is over the limit	Initialize the module
+25465	Number of notes consecutively rejected by RC13 is over the limit	Initialize the module
+25466	Number of notes consecutively rejected by RC14 is over the limit	Initialize the module
+25467	Number of notes consecutively rejected by RC15 is over the limit	Initialize the module
+25468	Number of notes consecutively rejected by RC16 is over the limit	Initialize the module
+25469	Accumulative number of notes rejected by RC11 is over the limit	Initialize the module
+25470	Accumulative number of notes rejected by RC12 is over the limit	Initialize the module
+25471	Accumulative number of notes rejected by RC13 is over the limit	Initialize the module
+25472	Accumulative number of notes rejected by RC14 is over the limit	Initialize the module
+25473	Accumulative number of notes rejected by RC15 is over the limit	Initialize the module
+25474	Accumulative number of notes rejected by RC16 is over the limit	Initialize the module
+25475	Number of notes dispensed from RC11 is above the specified number	Initialize the module
+25476	Number of notes dispensed from RC12 is above the specified number	Initialize the module
+25477	Number of notes dispensed from RC13 is above the specified number	Initialize the module
+25478	Number of notes dispensed from RC14 is above the specified number	Initialize the module
+25479	Number of notes dispensed from RC15 is above the specified number	Initialize the module
+25480	Number of notes dispensed from RC16 is above the specified number	Initialize the module
+25481	Number of notes dispensed from RC11 is below the specified number	Initialize the module
+25482	Number of notes dispensed from RC12 is below the specified number	Initialize the module
+25483	Number of notes dispensed from RC13 is below the specified number	Initialize the module
+25484	Number of notes dispensed from RC14 is below the specified number	Initialize the module
+25485	Number of notes dispensed from RC15 is below the specified number	Initialize the module
+25486	Number of notes dispensed from RC16 is below the specified number	Initialize the module
+25487	“RC setting” parameter error of RC11 (parameter undefined)	Initialize the module, and reset the parameter
+25488	“RC setting” parameter error of RC12 (parameter undefined)	Initialize the module, and reset the parameter
+25489	“RC setting” parameter error of RC13 (parameter undefined)	Initialize the module, and reset the parameter
+25490	“RC setting” parameter error of RC14 (parameter undefined)	Initialize the module, and reset the parameter
+25491	“RC setting” parameter error of RC15 (parameter undefined)	Initialize the module, and reset the parameter
+25492	“RC setting” parameter error of RC16 (parameter undefined)	Initialize the module, and reset the parameter
+25493	“Cassette type” setting error of RC11 (parameter undefined)	Initialize the module, and reset the parameter
+25494	“Cassette type” setting error of RC12 (parameter undefined)	Initialize the module, and reset the parameter
+25495	“Cassette type” setting error of RC13 (parameter undefined)	Initialize the module, and reset the parameter
+25496	“Cassette type” setting error of RC14 (parameter undefined)	Initialize the module, and reset the parameter
+25497	“Cassette type” setting error of RC15 (parameter undefined)	Initialize the module, and reset the parameter
+25498	“Cassette type” setting error of RC16 (parameter undefined)	Initialize the module, and reset the parameter
+25501	The module receives a wrong command and expects to receive the command “Initialization setting”	Initial the unit
+25502	The module receives a wrong command and expects to receive the command “Obtain cassette information"	Initial the unit
+25503	The module receives a wrong command and expects to receive the command “Initialization”	Initial the unit
+25504	The module receives a wrong command after executing the command “Deposit Preparation”	Initial the unit
+25505	The module receives a wrong command after executing the command “Withdrawal Preparation”	Initial the unit
+25506	The module receives a wrong command after executing the command “Preparation for the next transaction”	Initial the unit
+25507	The module receives a wrong command after executing the command “Withdrawal”	Initial the unit
+25508	The module receives a wrong command after executing the command “Delivery”	Initial the unit
+25509	unit received a wrong command after command "retract NF"	Initial the unit
+25510	The module receives a wrong command after executing the command “Counting”	Initial the unit
+25511	The module receives a wrong command after executing the command “Deposit”	Initial the unit
+25512	The module receives a wrong command after executing the command “Deposit cancelation”	Initial the unit
+25513	unit received a wrong command after command "retract NE"	Initial the unit
+25514	The module receives a wrong command after executing the command “Audit”	Initial the unit
+25515	The module receives a wrong command after executing the command “Obtain audit result”	Initial the unit
+25516	DRC internal communication error	Initialize the module
+25517	Internal stepping motor turn-on error of expansion cassette	Initialize the module
+25518	Internal stepping motor turn-off error of expansion cassette	Initialize the module
+25519	Internal DC motor turn-on error of expansion cassette	Initialize the module
+25520	Internal DC motor turn-off error of expansion cassette	Initialize the module
+25521	Internal electromagnet control error of expansion cassette	Initialize the module
+25522	Internal communication error of expansion cassette	Initialize the module
+25523	Notes over width limit are detected by withdrawal SF17	Initialize the module
+25524	Large roller tapes are used up, but there are still notes in NE	Initialize the module
+25559	RC11 SR01 detects the leaving of unknown notes	Initialize the module
+25560	RC12 SR01 detects the leaving of unknown notes	Initialize the module
+25561	RC13 SR01 detects the leaving of unknown notes	Initialize the module
+25562	RC14 SR01 detects the leaving of unknown notes	Initialize the module
+25563	RC15 SR01 detects the leaving of unknown notes	Initialize the module
+25564	RC16 SR01 detects the leaving of unknown notes	Initialize the module
+25565	RC11 SR01 detects the early arrival of unknown notes	Initialize the module
+25566	RC12 SR01 detects the early arrival of unknown notes	Initialize the module
+25567	RC13 SR01 detects the early arrival of unknown notes	Initialize the module
+25568	RC14 SR01 detects the early arrival of unknown notes	Initialize the module
+25569	RC15 SR01 detects the early arrival of unknown notes	Initialize the module
+25570	RC16 SR01 detects the early arrival of unknown notes	Initialize the module
+25571	Note jamming in RC11 SR01	Shield the invalid cassette and then initialize unit
+25572	Note jamming in RC12 SR01	Shield the invalid cassette and then initialize unit
+25573	Note jamming in RC13 SR01	Shield the invalid cassette and then initialize unit
+25574	Note jamming in RC14 SR01	Shield the invalid cassette and then initialize unit
+25575	Note jamming in RC15 SR01	Shield the invalid cassette and then initialize unit
+25576	Note jamming in RC16 SR01	Shield the invalid cassette and then initialize unit
+25577	retracted notes from roller do not enter cassette	Initialize the module
+25578	AC1 does not support DRC/DAC	Use the cassette of other type, and initialize the module
+25579	RC1 does not support DRC/DAC	Use the cassette of other type, and initialize the module
+25580	RC2 does not support DRC/DAC	Use the cassette of other type, and initialize the module
+25581	RC3 does not support DRC/DAC	Use the cassette of other type, and initialize the module
+25582	RC4 does not support DRC/DAC	Use the cassette of other type, and initialize the module
+25583	Cassette of unknown type is inserted in AC1	Use the cassette of other type, and initialize the module
+25584	Cassette of unknown type is inserted in RC1	Use the cassette of other type, and initialize the module
+25585	Cassette of unknown type is inserted in RC2	Use the cassette of other type, and initialize the module
+25586	Cassette of unknown type is inserted in RC3	Use the cassette of other type, and initialize the module
+25587	Cassette of unknown type is inserted in RC4	Use the cassette of other type, and initialize the module
+25588	RC failed to separate notes (the wing wheel is not in place)	Initial the unit
+25589	Notes are rejected for many times during audit	Initialize the module
+25590	RC11 pressure plate error	Shield the invalid cassette and then initialize unit
+25591	RC12 pressure plate error	Shield the invalid cassette and then initialize unit
+25592	RC13 pressure plate error	Shield the invalid cassette and then initialize unit
+25593	RC14 pressure plate error	Shield the invalid cassette and then initialize unit
+25594	RC15 pressure plate error	Shield the invalid cassette and then initialize unit
+25595	RC16 pressure plate error	Shield the invalid cassette and then initialize unit
+25601	“Clear OCR” parameter check error in the command “Initialization setting”	Initialize unit and send correct parameter command
+25602	“Empty note configured” parameter check error in the command “Initialization setting”	Initialize unit and send correct parameter command
+25603	“Cassette configuration” parameter check error in the command “Initialization setting”	Initialize unit and send correct parameter command
+25604	“Total number of currency types” is beyond the range in the command “Initialization setting”	Initialize unit and send correct parameter command
+25605	“Deposit mode” parameter check error in the command “Deposit”	Initialize unit and send correct parameter command
+25606	“Deposit limit” parameter check error in the command “Deposit”	Initialize unit and send correct parameter command
+25607	Parameter “Total number of rejected notes” is beyond the range in the command “Deposit”	Initialize unit and send correct parameter command
+25608	“Validation mode” parameter check error in the command “Deposit cancellation”	Initialize unit and send correct parameter command
+25609	“Withdrawal mode” parameter check error in the command “Withdrawal”	Initialize unit and send correct parameter command
+25610	“Validation mode” parameter check error in the command “Withdrawal”	Initialize unit and send correct parameter command
+25611	Parameter “Number of withdrawn notes” is beyond the range in the command “Deposit”	Initialize unit and send correct parameter command
+25612	“verification mode” parameter error in the retract comamnd	Initialize unit and send correct parameter command
+25613	“retracting area” parameter error in the retract command	Initialize unit and send correct parameter command
+25614	“Audit direction” parameter error in the command “Audit”	Initialize unit and send correct parameter command
+25615	“Audit mode” parameter error in the command “Audit”	Initialize unit and send correct parameter command
+25616	“Audit cassette” parameter error in the command “Audit”	Initialize unit and send correct parameter command
+25617	Cassette specified for withdrawal is absent in the command “Withdrawal”	Initialize unit and send correct parameter command
+25618	Cassette specified for withdrawal empty in the command “Withdrawal”	Initialize unit and send correct parameter command
+25619	Notes cannot be withdrawn from the cassette specified for withdrawal in the command “Withdrawal”	Initialize unit and send correct parameter command
+25620	Cassette specified for withdrawal abnormal in the command “Withdrawal”	Initialize unit and send correct parameter command
+25621	Transport speed parameter setting error in the command “Initialization setting”	Initialize unit and send correct parameter command
+25622	Cassette specified for audit is not empty in the command “Audit”	Initialize unit and send correct parameter command
+25623	The audit cassette is not empty in the command “Audit”	Initialize unit and send correct parameter command
+25624	The cassette specified for audit cannot be DC cassette in the command “Audit”	Initialize unit and send correct parameter command
+25625	Note in slot and withdrawal parameter setting error in the command “Initialization setting”	Initialize unit and send correct parameter command
+25626	ATC reuse parameter setting error in the command “Initialization setting”	Initialize unit and send correct parameter command
+25627	Setting error of parameter for continuously rejected and counted notes in the command “Initialization setting”	Initialize unit and send correct parameter command
+25628	Cassette specified for audit is absent in the command “Audit”	Initialize unit and send correct parameter command
+25629	Notes cannot be withdrawn from the specified cassette before command execution	Initialize unit and send correct parameter command
+25630	Cassette specified for audit is abnormal in the command “Audit”	Initialize unit and send correct parameter command
+25631	“ECB configuration” parameter setting error in the command “Initialization setting”	Initialize unit and send correct parameter command
+25632	“Motor number” parameter error in the command “Motor control”	Initialize unit and send correct parameter command
+25633	“Motor direction” parameter error in the command “Motor control”	Initialize unit and send correct parameter command
+25634	“solenoid number” parameter error in the command “solenoid control”	Initialize unit and send correct parameter command
+25635	“Control mode” parameter error in the command “solenoid control”	Initialize unit and send correct parameter command
+25636	“Cassette number” parameter error in the command “Obtain cassette currency information”	Initialize unit and send correct parameter command
+25637	The RC cassette specified for withdrawal is empty before command execution	Initialize unit and send correct parameter command
+25638	The audit cassette is empty before command execution	Initialize unit and send correct parameter command
+25639	“Note code strategy” setting error in the command “Initialization setting”	Initialize the module, and send a correct parameter command
+25640	Deposit-only command parameter setting error	Initialize the module, and send a correct parameter command
+25641	“DRC cassette setup” parameter check error in the command “Initialization setting”	Initialize the module, and send a correct parameter command
+25642	“DRC frame setup” parameter check error in the command “Initialization setting”	Initialize the module, and send a correct parameter command
+25643	The cassette specified for audit cannot be DRC cassette in the command “Audit”	Initialize the module, and send a correct parameter command
+25644	All RC are disabled in the "Retract" command	Initialize the module, and send a correct parameter command
+25645	All RCs are disabled in the "Deposit" command	Initialize the module, and send a correct parameter command
+25646	Cassette to be deposit in is full before the instruction is executed (112E). Failed to get driver board  version (2AF1)	Initialize unit, and send a correct parameter command
+25647	Cassette priority setting error before instruction execution (112F). Failed to get expansion board version (2AF2)	Initialize unit, and send a correct parameter command
+25648	No expansion board is installed	Initialize the module before installing the expansion board
+25650	ID parameter in the command “Open motor” is beyond the range	Initialize unit and send correct parameter command
+25651	Direction parameter in the command “Open motor” is beyond the range	Initialize unit and send correct parameter command
+25652	ID parameter in the command “Close motor” is beyond the range	Initialize unit and send correct parameter command
+25653	ID parameter in the command “solenoid control” is beyond the range	Initialize unit and send correct parameter command
+25654	solenoid coontrol command ID parameter error	Initialize unit, and send a correct parameter command
+25655	Fail to communicate with RC11	Shield the invalid cassette and then initialize unit
+25656	Fail to communicate with RC12	Shield the invalid cassette and then initialize unit
+25657	Fail to communicate with RC13	Shield the invalid cassette and then initialize unit
+25658	Fail to communicate with RC14	Shield the invalid cassette and then initialize unit
+25659	Fail to communicate with RC15	Shield the invalid cassette and then initialize unit
+25660	Fail to communicate with RC16	Shield the invalid cassette and then initialize unit
+25661	Fail to read the RC11 memory	Shield the invalid cassette and then initialize unit
+25662	Fail to read the RC12 memory	Shield the invalid cassette and then initialize unit
+25663	Fail to read the RC13 memory	Shield the invalid cassette and then initialize unit
+25664	Fail to read the RC14 memory	Shield the invalid cassette and then initialize unit
+25665	Fail to read the RC15 memory	Shield the invalid cassette and then initialize unit
+25666	Fail to read the RC16 memory	Shield the invalid cassette and then initialize unit
+25667	Fail to write the RC11 memory	Shield the invalid cassette and then initialize unit
+25668	Fail to write the RC12 memory	Shield the invalid cassette and then initialize unit
+25669	Fail to write the RC13 memory	Shield the invalid cassette and then initialize unit
+25670	Fail to write the RC14 memory	Shield the invalid cassette and then initialize unit
+25671	Fail to write the RC15 memory	Shield the invalid cassette and then initialize unit
+25672	Fail to write the RC16 memory	Shield the invalid cassette and then initialize unit
+25673	RC11 memory information reading check failure, please set again	Shield the invalid cassette and then initialize unit
+25674	RC12 memory information reading check failure, please set again	Shield the invalid cassette and then initialize unit
+25675	RC13 memory information reading check failure, please set again	Shield the invalid cassette and then initialize unit
+25676	RC14 memory information reading check failure, please set again	Shield the invalid cassette and then initialize unit
+25677	RC15 memory information reading check failure, please set again	Shield the invalid cassette and then initialize unit
+25678	RC16 memory information reading check failure, please set again	Shield the invalid cassette and then initialize unit
+25679	Fail to read the version information of AC2	Shield the invalid cassette and then initialize unit
+25680	Fail to read the version information of RC5	Shield the invalid cassette and then initialize unit
+25681	Fail to read the version information of RC6	Shield the invalid cassette and then initialize unit
+25682	Fail to read the version information of RC7	Shield the invalid cassette and then initialize unit
+25683	Fail to read the version information of RC8	Shield the invalid cassette and then initialize unit
+25684	Fail to read the version information of RC9	Shield the invalid cassette and then initialize unit
+25685	Fail to read the version information of RC10	Shield the invalid cassette and then initialize unit
+25686	Fail to read the version information of RC11	Shield the invalid cassette and then initialize unit
+25687	Fail to read the version information of RC12	Shield the invalid cassette and then initialize unit
+25688	Fail to read the version information of RC13	Shield the invalid cassette and then initialize unit
+25689	Fail to read the version information of RC14	Shield the invalid cassette and then initialize unit
+25690	Fail to read the version information of RC15	Shield the invalid cassette and then initialize unit
+25691	Fail to read the version information of RC16	Shield the invalid cassette and then initialize unit
+25692	Read the RC11 memory information, but the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25693	Read the RC12 memory information, but the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25694	Read the RC13 memory information, but the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25695	Read the RC14 memory information, but the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25696	Read the RC15 memory information, but the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25697	Read the RC16 memory information, but the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25698	MF03motor speed mode parameter setting error before the command executed	Initialize unit and send correct parameter command
+25699	UNFIT settings conflict with ECB settings	Initialize unit and send correct parameter command
+25701	Shutter is unlocked	Initial the unit
+25702	Upper unit is out of place	Initial the unit
+25703	Lower unit is out of place	Initial the unit
+25751	Upper thread return timeout	Initial the unit
+25752	Cassette thread return timeout	Initial the unit
+25753	NV thread return timeout	Initial the unit
+25754	Logical thread is abnormal	Initial the unit
+25755	The note queues exceed the maximum value	Initial the unit
+25756	Visit to error codes of jammed notes is abnormal	Initial the unit
+25757	Main control board version is not compatible with upper control board version	Upgrade the upper control board program
+25771	Error of erasing FLASH	Initial the unit
+25772	Error of writing FLASH	Initial the unit
+25773	Fail to write unit sequence number due to existing unit sequence number	Initial the unit
+25774	Fail to get unit sequence number due to unavailable unit sequence number	Initial the unit
+25775	cassette, upper plate, NV serial number read / write operation failed.	Initialize the unit Or initialize the unit after shielding the error money box.
+25783	Working KEY writing failed	Retry
+25784	Working KEY reading failed	Retry
+25785	Working KEY checking failed	Retry
+25786	Withdrawal MAC checking failed	Retry
+25787	Depositing MAC checking failed	Retry
+25788	Counting MAC checking failed	Retry
+25789	It isn't in test mode when revising the public key	Retry
+25790	Writing EEPROM failed during setting of public key	Retry
+25791	Fail to acquire the public key from EEPROM	Retry
+25792	Checking failed when acquiring the public key	Retry
+25801	Error occurred to communication for motor opening	Initial the unit
+25802	Error occurred to communication for motor closing	Initial the unit
+25803	Error occurred to communication for control of solenoid	Initial the unit
+25804	Error occurred to communication for reset of upper board	Initial the unit
+25805	Error occurred to communication for obtaining version by upper board	Initial the unit
+25806	Error occurred to communication for obtaining luminescence of sensor by upper board	Initial the unit
+25807	Error occurred to communication for obtaining motor status of upper board	Initial the unit
+25808	Error occurred to communication for obtaining NE dial pulse number	Initial the unit
+25809	Error occurred to communication for setting transport speed of upper board	Initial the unit
+25810	"DC currency" setting error of AC2	Initialize the module, and reset the parameter
+25811	"DC currency" setting error of RC5	Initialize the module, and reset the parameter
+25812	"DC currency" setting error of RC6	Initialize the module, and reset the parameter
+25813	"DC currency" setting error of RC7	Initialize the module, and reset the parameter
+25814	"DC currency" setting error of RC8	Initialize the module, and reset the parameter
+25815	"DC currency" setting error of RC9	Initialize the module, and reset the parameter
+25816	"DC currency" setting error of RC10	Initialize the module, and reset the parameter
+25817	"DC currency" setting error of RC11	Initialize the module, and reset the parameter
+25818	"DC currency" setting error of RC12	Initialize the module, and reset the parameter
+25819	"DC currency" setting error of RC13	Initialize the module, and reset the parameter
+25820	"DC currency" setting error of RC14	Initialize the module, and reset the parameter
+25821	"DC currency" setting error of RC15	Initialize the module, and reset the parameter
+25822	"DC currency" setting error of RC16	Initialize the module, and reset the parameter
+25823	AC2 does not support DRC/DAC	Use the cassette of other type, and initialize the module
+25824	RC5 does not support DRC/DAC	Use the cassette of other type, and initialize the module
+25825	RC6 does not support DRC/DAC	Use the cassette of other type, and initialize the module
+25826	RC7 does not support DRC/DAC	Use the cassette of other type, and initialize the module
+25827	RC8 does not support DRC/DAC	Use the cassette of other type, and initialize the module
+25828	Cassette of unknown type is inserted in AC2	Use the cassette of other type, and initialize the module
+25829	Cassette of unknown type is inserted in RC5	Use the cassette of other type, and initialize the module
+25830	Cassette of unknown type is inserted in RC6	Use the cassette of other type, and initialize the module
+25831	Cassette of unknown type is inserted in RC7	Use the cassette of other type, and initialize the module
+25832	Cassette of unknown type is inserted in RC8	Use the cassette of other type, and initialize the module
+25833	Upper board communication error	initial unit
+25849	There is an unsupported cassette in the device	Shield the invalid cassette and then initialize unit
+25850	Fail to communicate with AC2	Shield the invalid cassette and then initialize unit
+25851	Communication with AC failed	Shield the invalid cassette and then initialize unit
+25852	Communication with RC1 failed	Shield the invalid cassette and then initialize unit
+25853	Communication with RC2 failed	Shield the invalid cassette and then initialize unit
+25854	Communication with RC3 failed	Shield the invalid cassette and then initialize unit
+25855	Communication with RC4 failed	Shield the invalid cassette and then initialize unit
+25856	Communication with ATC failed	Shield the invalid cassette and then initialize unit
+25857	Failed to read cassette memory of AC	Shield the invalid cassette and then initialize unit
+25858	Failed to read cassette memory of RC1	Shield the invalid cassette and then initialize unit
+25859	Failed to read cassette memory of RC2	Shield the invalid cassette and then initialize unit
+25860	Failed to read cassette memory of RC3	Shield the invalid cassette and then initialize unit
+25861	Failed to read cassette memory of RC4	Shield the invalid cassette and then initialize unit
+25862	Failed to read cassette memory of ATC	Shield the invalid cassette and then initialize unit
+25863	Fail to read the AC2 memory	Shield the invalid cassette and then initialize unit
+25864	Fail to read the RC5 memory	Shield the invalid cassette and then initialize unit
+25865	Fail to read the RC6 memory	Shield the invalid cassette and then initialize unit
+25866	Fail to read the RC7 memory	Shield the invalid cassette and then initialize unit
+25867	Fail to read the RC8 memory	Shield the invalid cassette and then initialize unit
+25868	Fail to read the RC9 memory	Shield the invalid cassette and then initialize unit
+25869	Fail to read the RC10 memory	Shield the invalid cassette and then initialize unit
+25870	Fail to communicate with RC5	Shield the invalid cassette and then initialize unit
+25871	Fail to communicate with RC6	Shield the invalid cassette and then initialize unit
+25872	Fail to communicate with RC7	Shield the invalid cassette and then initialize unit
+25873	Failed to write cassette memory of AC	Shield the invalid cassette and then initialize unit
+25874	Failed to write cassette memory of RC1	Shield the invalid cassette and then initialize unit
+25875	Failed to write cassette memory of RC2	Shield the invalid cassette and then initialize unit
+25876	Failed to write cassette memory of RC3	Shield the invalid cassette and then initialize unit
+25877	Failed to write cassette memory of RC4	Shield the invalid cassette and then initialize unit
+25878	Failed to write cassette memory of ATC	Shield the invalid cassette and then initialize unit
+25879	Fail to write the AC2 memory	Shield the invalid cassette and then initialize unit
+25880	Fail to write the RC5 memory	Shield the invalid cassette and then initialize unit
+25881	Fail to write the RC6 memory	Shield the invalid cassette and then initialize unit
+25882	Fail to write the RC7 memory	Shield the invalid cassette and then initialize unit
+25883	Fail to write the RC8 memory	Shield the invalid cassette and then initialize unit
+25884	Fail to write the RC9 memory	Shield the invalid cassette and then initialize unit
+25885	Fail to write the RC10 memory	Shield the invalid cassette and then initialize unit
+25886	Fail to communicate with RC8	Shield the invalid cassette and then initialize unit
+25887	Fail to communicate with RC9	Shield the invalid cassette and then initialize unit
+25888	Fail to communicate with RC10	Shield the invalid cassette and then initialize unit
+25889	AC memory information check error is read, please set again	Shield the invalid cassette and then initialize unit
+25890	RC1 memory information check error is read, please set again	Shield the invalid cassette and then initialize unit
+25891	RC2 memory information check error is read, please set again	Shield the invalid cassette and then initialize unit
+25892	RC3 memory information check error is read, please set again	Shield the invalid cassette and then initialize unit
+25893	RC4 memory information check error is read, please set again	Shield the invalid cassette and then initialize unit
+25894	AC memory information check error is read, please set again	Shield the invalid cassette and then initialize unit
+25895	AC2 memory information reading check failure, please set again	Shield the invalid cassette and then initialize unit
+25896	RC5 memory information reading check failure, please set again	Shield the invalid cassette and then initialize unit
+25897	RC6 memory information reading check failure, please set again	Shield the invalid cassette and then initialize unit
+25898	RC7 memory information reading check failure, please set again	Shield the invalid cassette and then initialize unit
+25899	RC8 memory information reading check failure, please set again	Shield the invalid cassette and then initialize unit
+25900	RC9 memory information reading check failure, please set again	Shield the invalid cassette and then initialize unit
+25901	RC10 memory information reading check failure, please set again	Shield the invalid cassette and then initialize unit
+25905	Failed to read version information of AC box	Shield the invalid cassette and then initialize unit
+25906	Failed to read version information of RC1 box	Shield the invalid cassette and then initialize unit
+25907	Failed to read version information of RC2 box	Shield the invalid cassette and then initialize unit
+25908	Failed to read version information of RC3 box	Shield the invalid cassette and then initialize unit
+25909	Failed to read version information of RC4 box	Shield the invalid cassette and then initialize unit
+25910	Failed to read version information of ATC box	Shield the invalid cassette and then initialize unit
+25921	After reading AC box memory information, the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25922	After reading RC1 box memory information, the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25923	After reading RC2 box memory information, the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25924	After reading RC3 box memory information, the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25925	After reading RC4 box memory information, the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25926	After reading ATC box memory information, the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25927	Read the AC2 memory information, but the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25928	Read the RC5 memory information, but the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25929	Read the RC6 memory information, but the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25930	Read the RC7 memory information, but the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25931	Read the RC8 memory information, but the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25932	Read the RC9 memory information, but the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25933	Read the RC10 memory information, but the cassette type does not match the actual type	Shield the invalid cassette and then initialize unit
+25934	Parameter setting error when set notes replenishment amount command	Initial the unit
+25935	Command length error	Initial the unit
+25936	Fail to read AC1 image number information	Shield the error cassette and then initial the unit
+25937	There are notes at slot but not detected	Initial the unit
+25938	Notes jammed or linked between RC1SR01 to RC9SR01	Initial the unit
+25939	Notes jammed or linked between RC2SR01 to RC10SR01	Initial the unit
+25940	Notes jammed or linked between RC3SR01 to RC11SR01	Initial the unit
+25941	Notes jammed or linked between RC4SR01 to RC12SR02	Initial the unit
+25942	Notes jammed or linked between RC5SR01 to RC13SR03	Initial the unit
+25943	Notes jammed or linked between RC6SR01 to RC14SR04	Initial the unit
+25944	Notes jammed or linked between RC7SR01 to RC15SR05	Initial the unit
+25945	ATC "cassette currency" setting error	Initial the unit
+25946	Direct deposit account is not balanced	Initial the unit
+25951	NV communication error	Initial the unit
+25952	NV length obtaining error	Initial the unit
+25953	NV receiving error	Initial the unit
+25954	NV synchronization error	Initial the unit
+25955	Empty NV buffer zone, failed to obtain note information	Initial the unit
+25956	Failed to enable/forbid communication with NV	Initial the unit
+25957	Communication with NV for testing compatibility failed	Initial the unit
+25958	Communication with NV for setting algorithm information failed	Initial the unit
+25959	Communication with NV for setting note type failed	Initial the unit
+25960	Communication with NV for obtaining note type failed	Initial the unit
+25961	Communication with NV for obtaining sensor count value failed	Initial the unit
+25962	Communication with NV for obtaining version failed	Initial the unit
+25963	Communication with NV for setting working process failed	Initial the unit
+25964	Communication with NV for setting mode failed	Initial the unit
+25965	Communication with NV for clearing note count failed	Initial the unit
+25966	Communication with NV for obtaining voltage of thickness sensor failed	Initial the unit
+25967	Communication with NV for obtaining self-test information failed	Initial the unit
+25968	Communication with NV for obtaining sensor status failed	Initial the unit
+25969	Communication with NV for clearing OCR failed	Initial the unit
+25970	Communication with NV for reset failed	Initial the unit
+25971	Communication with NV for obtaining thickness value K failed	Initial the unit
+26001	NV enabling receiving error	Initial the unit
+26002	NV compatibility testing error	Initial the unit
+26003	NV setting algorithm error	Initial the unit
+26004	NV failed to set note type	Initial the unit
+26005	NV failed to obtain sensor count value	Initial the unit
+26006	NV failed to obtain note information	Initial the unit
+26007	NV failed to obtain version	Initial the unit
+26008	NV failed to set workflow	Initial the unit
+26009	NV failed to send note number	Initial the unit
+26010	NV failed to set mode	Initial the unit
+26011	NV failed to clear note count	Initial the unit
+26012	NV failed to obtain voltage of thickness sensor	Initial the unit
+26013	NV failed to obtain self-test information	Initial the unit
+26014	NV failed to obtain sensor information	Initial the unit
+26015	NV failed to clear OCR	Initial the unit
+26016	NV failed to reset	Initial the unit
+26017	Failed to obtain note type	Initial the unit
+26018	NV failed to enable setting of CIS1	Initial the unit
+26019	NV failed to enable setting of CIS2	Initial the unit
+26020	NV failed to enable setting of CIS1 and CIS2	Initial the unit
+26021	NV cover plate is unclosed during enabling of NV	Initial the unit
+26022	NV failed to set withdrawal level	Initial the unit
+26023	NV failed to set OCR recognition mode	Initial the unit
+26024	NV is wrong to set OCR class	Initial the unit
+26025	NV exceeds the limit when setting note type information	Initial the unit
+26026	NV failed to obtain thickness value K	Initial the unit
+26027	NV failed to set speed	Initial the unit
+26101	Image FPGA configuration error of DSP	Initial the unit
+26102	SDRAM of DSP is abnormal	Initial the unit
+26103	Code update error	Initial the unit
+26104	CIS1 brightness automatic adjustment error of DSP	Initial the unit
+26105	CIS2 brightness automatic adjustment error of DSP	Initial the unit
+26106	AD19822 configuration error of DSP	Initial the unit
+26107	AD29822 configuration error of DSP	Initial the unit
+26108	Abnormal light adjustment of sensors in the first row	Initial the unit
+26109	Abnormal OCR template of DSP	Initial the unit
+26110	Magnetic FPGA configuration error of DSP	Initial the unit
+26111	Abnormal light adjustment of sensors in the second row	Initial the unit
+26112	Abnormal light adjustment of sensors in the third row	Initial the unit
+26113	Abnormal light adjustment of sensors in the fourth row	Initial the unit
+26114	Unclosed SNV-NV top cover	Initial the unit
+26115	SNV-NV fan error	Initial the unit
+26116	Unclosed SNV-NV watchdog switch	Initial the unit
+26117	Abnormal light adjustment of left sensors in the first row	Initial the unit
+26118	Abnormal light adjustment of middle sensors in the first row	Initial the unit
+26119	Abnormal light adjustment of right sensors in the first row	Initial the unit
+26120	Abnormal light adjustment of left sensors in the second row	Initial the unit
+26121	Abnormal light adjustment of middle sensors in the second row	Initial the unit
+26122	Abnormal light adjustment of right sensors in the second row	Initial the unit
+26123	Abnormal light adjustment of left sensors in the third row	Initial the unit
+26124	Abnormal light adjustment of middle sensors in the third row	Initial the unit
+26125	Abnormal light adjustment of right sensors in the third row	Initial the unit
+26126	Abnormal light adjustment of left sensors in the fourth row	Initial the unit
+26127	Abnormal light adjustment of middle sensors in the fourth row	Initial the unit
+26128	Abnormal light adjustment of right sensors in the fourth row	Initial the unit
+26129	NV self-calibration retention error code	Initial the unit
+26130	NV self-calibration retention error code	Initial the unit
+26131	NV self-calibration retention error code	Initial the unit
+26132	NV self-calibration retention error code	Initial the unit
+26133	CIS1 location suspected to contain notes.	Initial the unit
+26134	CIS2 location suspected to contain notes	Initial the unit
+26135	NV self-calibration retention error code	Initial the unit
+26136	NV self-calibration retention error code	Initial the unit
+26137	NV self-calibration retention error code	Initial the unit
+26138	NV self-calibration retention error code	Initial the unit
+26139	NV self-calibration retention error code	Initial the unit
+26140	NV self-calibration retention error code	Initial the unit
+26141	NV self-calibration retention error code	Initial the unit
+26142	NV self-calibration retention error code	Initial the unit
+26143	NV self-calibration retention error code	Initial the unit
+26144	NV self-calibration retention error code	Initial the unit
+26145	NV self-calibration retention error code	Initial the unit
+26146	NV self-calibration retention error code	Initial the unit
+26147	NV self-calibration retention error code	Initial the unit
+26148	NV self-calibration retention error code	Initial the unit
+26149	NV self-calibration retention error code	Initial the unit
+26150	NV self-calibration retention error code	Initial the unit
+26151	NV self-calibration retention error code	Initial the unit
+26152	NV self-calibration retention error code	Initial the unit
+26153	NV self-calibration retention error code	Initial the unit
+26154	NV self-calibration retention error code	Initial the unit
+26161	Notes are founded by NV sensors in the first row	Initial the unit
+26162	Notes are founded by NV sensors in the second row	Initial the unit
+26163	Notes are founded by NV sensors in the third row	Initial the unit
+26164	Notes are founded by NV sensors in the fourth row	Initial the unit
+26181	Wrong sequence number of NV notes	Initial the unit
+26182	NV inner sensor calculation error	Initial the unit
+26183	NV count is inconsistent with count of nodule	Initial the unit
+26184	NV firmware FPGA version error	Upgrade and calibrate the NV firmware again, and initialize the module
+26201	Open the Shutter timeout	Upper layer retry or initialize the unit depending on business process
+26202	Close the Shutter timeout	Upper layer retry or initialize the unit depending on business process
+26203	Abnormal shutter sensor	Upper layer retry or initialize the unit depending on business process
+26204	Unclosed SUF07 testing shutter after the shutter is opened	Upper layer retry or initialize the unit depending on business process
+26205	Unlocked SUF08 testing shutter after the shutter is closed	Upper layer retry or initialize the unit depending on business process
+26206	Shutter is blocked by notes after the shutter is closed successfully	Upper layer retry or initialize the unit depending on business process
+26207	AC2 notes pressing board failure	Initial the unit
+26208	RC5 notes pressing board failure	Shield the invalid cassette and then initialize unit
+26209	RC6 notes pressing board failure	Shield the invalid cassette and then initialize unit
+26210	RC7 notes pressing board failure	Shield the invalid cassette and then initialize unit
+26211	RC8 notes pressing board failure	Shield the invalid cassette and then initialize unit
+26212	RC9 notes pressing board failure	Shield the invalid cassette and then initialize unit
+26213	RC10 notes pressing board failure	Shield the invalid cassette and then initialize unit
+26214	AC2 notes pressing board reset timeout	Initial the unit
+26215	RC5 notes pressing board reset timeout	Shield the invalid cassette and then initialize unit
+26216	RC6 notes pressing board reset timeout	Shield the invalid cassette and then initialize unit
+26217	RC7 notes pressing board reset timeout	Shield the invalid cassette and then initialize unit
+26218	RC8 notes pressing board reset timeout	Shield the invalid cassette and then initialize unit
+26219	RC9 notes pressing board reset timeout	Shield the invalid cassette and then initialize unit
+26220	RC10 notes pressing board reset timeout	Shield the invalid cassette and then initialize unit
+26221	AC2 notes pressing board raising timed out	Initial the unit
+26222	RC5 notes pressing board raising timed out	Shield the invalid cassette and then initialize unit
+26223	RC6 notes pressing board raising timed out	Shield the invalid cassette and then initialize unit
+26224	RC7 notes pressing board raising timed out	Shield the invalid cassette and then initialize unit
+26225	RC8 notes pressing board raising timed out	Shield the invalid cassette and then initialize unit
+26226	RC9 notes pressing board raising timed out	Shield the invalid cassette and then initialize unit
+26227	RC10 notes pressing board raising timed out	Shield the invalid cassette and then initialize unit
+26228	AC2 note pressing board pressing down error	Initial the unit
+26229	RC5 notes pressing board pressing down error	Shield the invalid cassette and then initialize unit
+26230	RC6 notes pressing board pressing down error	Shield the invalid cassette and then initialize unit
+26231	RC7 notes pressing board pressing down error	Shield the invalid cassette and then initialize unit
+26232	RC8 notes pressing board pressing down error	Shield the invalid cassette and then initialize unit
+26233	RC9 notes pressing board pressing down error	Shield the invalid cassette and then initialize unit
+26234	RC10 notes pressing board pressing down error	Shield the invalid cassette and then initialize unit
+26235	Failed to power up AC2 electromagnet	Initial the unit
+26236	Failed to power up RC5 electromagnet	Shield the invalid cassette and then initialize unit
+26237	Failed to power up RC6 electromagnet	Shield the invalid cassette and then initialize unit
+26238	Failed to power up RC7 electromagnet	Shield the invalid cassette and then initialize unit
+26239	Failed to power up RC8 electromagnet	Shield the invalid cassette and then initialize unit
+26240	Failed to power up RC9 electromagnet	Shield the invalid cassette and then initialize unit
+26241	Failed to power up RC10 electromagnet	Shield the invalid cassette and then initialize unit
+26242	Failed to release AC2 electromagnet	Initial the unit
+26243	Failed to release RC5 electromagnet	Shield the invalid cassette and then initialize unit
+26244	Failed to release RC6 electromagnet	Shield the invalid cassette and then initialize unit
+26245	Failed to release RC7 electromagnet	Shield the invalid cassette and then initialize unit
+26246	Failed to release RC8 electromagnet	Shield the invalid cassette and then initialize unit
+26247	Failed to release RC9 electromagnet	Shield the invalid cassette and then initialize unit
+26248	Failed to release RC10 electromagnet	Shield the invalid cassette and then initialize unit
+26251	The pressing plate failed to move to SUF03	Initial the unit
+26252	The pressing plate failed to move to SUF04	Initial the unit
+26253	The pressing plate failed to move to SUF05	Initial the unit
+26254	The pressing plate failed to move to SUF06	Initial the unit
+26255	The top plate failed to move to SUF01	Initial the unit
+26256	The top plate failed to move to SUF02	Initial the unit
+26257	Not all notes are removed from the slot	Initial the unit
+26258	The top plate failed to move to UF05	Initial the unit
+26259	slot fail to separate notes	Initial the unit
+26260	AC2 motor failure	Initial the unit
+26261	RC5 motor failure	Shield the invalid cassette and then initialize unit
+26262	RC6 motor failure	Shield the invalid cassette and then initialize unit
+26263	RC7 motor failure	Shield the invalid cassette and then initialize unit
+26264	RC8 motor failure	Shield the invalid cassette and then initialize unit
+26265	RC9 motor failure	Shield the invalid cassette and then initialize unit
+26266	RC10 motor failure	Shield the invalid cassette and then initialize unit
+26267	Failed to reset AC2 impeller	Initial the unit
+26268	Failed to reset RC5 impeller	Shield the invalid cassette and then initialize unit
+26269	Failed to reset RC6 impeller	Shield the invalid cassette and then initialize unit
+26270	Failed to reset RC7 impeller	Shield the invalid cassette and then initialize unit
+26271	Failed to reset RC8 impeller	Shield the invalid cassette and then initialize unit
+26272	Failed to reset RC9 impeller	Shield the invalid cassette and then initialize unit
+26273	Failed to reset RC10 impeller	Shield the invalid cassette and then initialize unit
+26274	RC5 failed to separate notes	Shield the invalid cassette and then initialize unit
+26275	RC6 failed to separate notes	Shield the invalid cassette and then initialize unit
+26276	RC7 failed to separate notes	Shield the invalid cassette and then initialize unit
+26277	RC8 failed to separate notes	Shield the invalid cassette and then initialize unit
+26278	RC9 failed to separate notes	Shield the invalid cassette and then initialize unit
+26279	RC10 failed to separate notes	Shield the invalid cassette and then initialize unit
+26280	AC2 does not exist	After inserting into the AC box, initialize the movement
+26281	RC5 does not exist	Shield the invalid cassette and then initialize unit
+26282	RC6 does not exist	Shield the invalid cassette and then initialize unit
+26283	RC7 does not exist	Shield the invalid cassette and then initialize unit
+26284	RC8 does not exist	Shield the invalid cassette and then initialize unit
+26285	RC9 does not exist	Shield the invalid cassette and then initialize unit
+26286	RC10 does not exist	Shield the invalid cassette and then initialize unit
+26287	AC2 is full	Stop service
+26288	RC5 is full	Shield the invalid cassette and then initialize unit
+26289	RC6 is full	Shield the invalid cassette and then initialize unit
+26290	RC7 is full	Shield the invalid cassette and then initialize unit
+26291	RC8 is full	Shield the invalid cassette and then initialize unit
+26292	RC9 is full	Shield the invalid cassette and then initialize unit
+26293	RC10 is full	Shield the invalid cassette and then initialize unit
+26294	RC5 is empty but dispensed notes amount does not meet required	Initialize unit, and select other cassette to dispense the notes
+26295	RC6 is empty but dispensed notes amount does not meet required	Initialize unit, and select other cassette to dispense the notes
+26296	RC7 is empty but dispensed notes amount does not meet required	Initialize unit, and select other cassette to dispense the notes
+26297	RC8 is empty but dispensed notes amount does not meet required	Initialize unit, and select other cassette to dispense the notes
+26298	RC9 is empty but dispensed notes amount does not meet required	Initialize unit, and select other cassette to dispense the notes
+26299	RC10 is empty but dispensed notes amount does not meet required	Initialize unit, and select other cassette to dispense the notes
+26301	Note detected at the slot when there is an action in the slot	Upper layer handles the abnormality depending on business process after initialization
+26302	Self-test process of the shutter timeout	Initial the unit
+26303	Reset process treatment of reset rubber wheel timeout	Initial the unit
+26304	Processing of resetting sheet roller times out	Initial the unit
+26305	NO note that should be located at the slot of the module is detected	Initial the unit
+26306	NO note that should be located at the slot of the module is detected (SF15)	Initial the unit
+26307	NO note that should be located at the slot of the module is detected (ST01)	Initial the unit
+26308	NO note that should be located at the slot of the module is detected (ST02)	Initial the unit
+26309	NO note that should be located at the slot of the module is detected (ST03)	Initial the unit
+26310	NO note that should be located at the slot of the module is detected (ST05)	Initial the unit
+26311	NO note that should be located at the slot of the module is detected (ST07)	Initial the unit
+26312	NO note that should be located at the slot of the module is detected (ST08)	Initial the unit
+26313	NO note that should be located at the slot of the module is detected (SE01)	Initial the unit
+26314	NO note that should be located at the slot of the module is detected (SE02)	Initial the unit
+26315	NO note that should be located at the slot of the module is detected (SF17)	Initial the unit
+26316	NO note that should be located at the slot of the module is detected (SD01)	Initial the unit
+26317	NO note that should be located at the slot of the module is detected (SD02)	Initial the unit
+26318	NO note that should be located at the slot of the module is detected (SD03)	Initial the unit
+26319	NO note that should be located at the slot of the module is detected (SD04)	Initial the unit
+26320	NO note that should be located at the slot of the module is detected (SD05)	Initial the unit
+26321	NO note that should be located at the slot of the module is detected (SD06)	Initial the unit
+26322	No note that should be located at the LRB of the module is detected (SF15)	Initial the unit
+26323	No note that should be located at the LRB of the module is detected (ST01)	Initial the unit
+26324	No note that should be located at the LRB of the module is detected (ST02)	Initial the unit
+26325	No note that should be located at the LRB of the module is detected (ST03)	Initial the unit
+26326	No note that should be located at the LRB of the module is detected (ST05)	Initial the unit
+26327	No note that should be located at the LRB of the module is detected (ST07)	Initial the unit
+26328	No note that should be located at the LRB of the module is detected (ST08)	Initial the unit
+26329	No note that should be located at the LRB of the module is detected (SE01)	Initial the unit
+26330	No note that should be located at the LRB of the module is detected (SE02)	Initial the unit
+26331	No note that should be located at the LRB of the module is detected (SF17)	Initial the unit
+26332	No note that should be located at the LRB of the module is detected (SD01)	Initial the unit
+26333	No note that should be located at the LRB of the module is detected (SD02)	Initial the unit
+26334	No note that should be located at the LRB of the module is detected (SD03)	Initial the unit
+26335	No note that should be located at the LRB of the module is detected (SD04)	Initial the unit
+26336	No note that should be located at the LRB of the module is detected (SD05)	Initial the unit
+26337	No note that should be located at the LRB of the module is detected (SD06)	Initial the unit
+26338	No note that should be located at the ATC of the module is detected (SF15)	Initial the unit
+26339	No note that should be located at the ATC of the module is detected (ST01)	Initial the unit
+26340	No note that should be located at the ATC of the module is detected (ST02)	Initial the unit
+26341	No note that should be located at the ATC of the module is detected (ST03)	Initial the unit
+26342	No note that should be located at the ATC of the module is detected (ST05)	Initial the unit
+26343	No note that should be located at the ATC of the module is detected (ST07)	Initial the unit
+26344	No note that should be located at the ATC of the module is detected (ST08)	Initial the unit
+26345	No note that should be located at the ATC of the module is detected (SE01)	Initial the unit
+26346	No note that should be located at the ATC of the module is detected (SE02)	Initial the unit
+26347	No note that should be located at the ATC of the module is detected (SF17)	Initial the unit
+26348	No note that should be located at the ATC of the module is detected (SD01)	Initial the unit
+26349	No note that should be located at the ATC of the module is detected (SD02)	Initial the unit
+26350	No note that should be located at the ATC of the module is detected (SD03)	Initial the unit
+26351	UT03 sensor fails or does not rotate	Initial the unit
+26352	No note that should be located at the ATC of the module is detected (SD04)	Initial the unit
+26353	No note that should be located at the ATC of the module is detected (SD05)	Initial the unit
+26354	No note that should be located at the ATC of the module is detected (SD06)	Initial the unit
+26355	Electromagnet logic ID error	Initial the unit
+26356	Electromagnet physics ID error	Initial the unit
+26357	Lower channel stepper motor logic ID error	Initial the unit
+26358	Lower channel DC motor logic ID error	Initial the unit
+26359	DRC cassette electromagnet control error	Initial the unit
+26360	DRC cassette stepper motor failed to start	Initial the unit
+26361	The unknown note arrives detected by ST05	Initial the unit
+26362	The unknown note arrives detected by ST08	Initial the unit
+26363	The unknown note arrives detected by SF17	Initial the unit
+26364	DRC cassette stepper motor failed to close	Initial the unit
+26365	DRC cassette DC motor failed to start	Initial the unit
+26366	DRC cassette DC motor failed to close	Initial the unit
+26367	Lower channel stepper motor physical ID error	Initial the unit
+26368	Lower channel DC motor physical ID error	Initial the unit
+26371	The unknown note leaves detected by ST05	Initial the unit
+26372	The unknown note leaves detected by ST08	Initial the unit
+26373	The unknown note leaves detected by SF17	Initial the unit
+26381	ST05 detects the unknown note arrives too early	Initial the unit
+26382	ST08 detects the unknown note arrives too early	Initial the unit
+26383	SF17 detects the unknown note arrives too early	Initial the unit
+26391	Double note or note jam  between ST05 and ST08	Initial the unit
+26392	Notes jaming or are linking between ST05 and SE01	Initial the unit
+26393	Notes jaming or are linking between ST05 and SF17	Initial the unit
+26394	Notes jaming or are linking between ST08 and ATC SR01	Initial the unit
+26395	Notes jaming or are linking between ST08 and ST05	Initial the unit
+26396	Notes jaming or are linking between SE01 and ST05	Initial the unit
+26397	Notes jaming or are linking between RC3SR01 and ST08	Initial the unit
+26398	Notes jaming or are linking between SE01 and SF17	Initial the unit
+26399	notes jammed or linked in channel between ST08 to SD04	Initial the unit
+26401	Note jam at ST05	Initial the unit
+26402	Note jam at ST08	Initial the unit
+26403	Note jam at ST07	Initial the unit
+26404	Note jam at SF17	Initial the unit
+26411	Notes in a wrong transport are detected by ST08 sensor	Initial the unit
+26412	Notes in a wrong transport are detected by SE01 sensor	Initial the unit
+26413	Notes in a wrong transport are detected by SF17 sensor	Initial the unit
+26420	Unit security verfication error	Unit security verfication error, please contact with supplier
+26421	Unit security verfication error	Unit security verfication error, please contact with supplier
+26422	Unit security verfication error	Unit security verfication error, please contact with supplier
+26423	Unit security verfication error	Unit main board error, initial or contact with supplier
+26424	Unit security verfication error	Unit security verfication error, please contact with supplier
+26425	Unit security verfication error	Unit security verfication error, please contact with supplier
+26426	Unit security verfication error	Unit security verfication error, please contact with supplier
+26427	Unit security verfication error	Unit security verfication error, please contact with supplier
+26428	Unit security verfication error	Unit security verfication error, please contact with supplier
+26429	Unit security verfication error	Unit security verfication error, please contact with supplier
+26430	Unit security verfication error	Unit security verfication error, please contact with supplier
+26431	Unit security verfication error	Unit security verfication error, please contact with supplier
+26432	Unit security verfication error	Unit security verfication error, please contact with supplier
+26433	Unit security verfication error	Unit security verfication error, please contact with supplier
+26434	Unit security verfication error	Unit security verfication error, please contact with supplier
+26435	Unit security verfication error	Unit security verfication error, please contact with supplier
+26436	Unit security verfication error	Unit security verfication error, please contact with supplier
+26437	Unit security verfication error	Unit security verfication error, please contact with supplier
+26438	Unit security verfication error	Unit security verfication error, please contact with supplier
+26451	UT02 sensor error or MT01 does not rotate	Initial the unit
+26452	UF10 sensor error or MF04  does not rotate	Initial the unit
+26461	The unknown note arrives detected by SNV01	Initial the unit
+26462	The unknown note arrives detected by SNV02	Initial the unit
+26463	The unknown note arrives detected by SF15	Initial the unit
+26464	The unknown note arrives detected by ST01	Initial the unit
+26465	The unknown note arrives detected by ST02	Initial the unit
+26466	The unknown note arrives detected by ST03	Initial the unit
+26471	The unknown note leaves detected by SNV01	Initial the unit
+26472	The unknown note leaves detected by SNV02	Initial the unit
+26473	The unknown note leaves detected by SF15	Initial the unit
+26474	The unknown note leaves detected by ST01	Initial the unit
+26475	The unknown note leaves detected by ST02	Initial the unit
+26476	The unknown note leaves detected by ST03	Initial the unit
+26481	SNV1 detects the unknown note arrives too early	Initial the unit
+26482	SNV2 detects the unknown note arrives too early	Initial the unit
+26483	SF15 detects the unknown note arrives too early	Initial the unit
+26484	ST01 detects the unknown note arrives too early	Initial the unit
+26485	ST02 detects the unknown note arrives too early	Initial the unit
+26486	ST03 detects the unknown note arrives too early	Initial the unit
+26491	Notes jaming or are linking between ST15 and ST01	Initial the unit
+26492	Notes jaming or are linking between ST01 and ST03, ST04	Initial the unit
+26493	Notes jaming or are linking between ST02 and ST03, ST04	Initial the unit
+26494	Notes jaming or are linking between ST03, ST04 and ST05, ST06	Initial the unit
+26495	Notes jaming or are linking between ST02 and SD01	Initial the unit
+26496	Notes jaming or are linking between ST03, ST04 and ST01	Initial the unit
+26497	Notes jaming or are linking between ST05, ST06 and ST03, ST04	Initial the unit
+26501	Note jam at SNVO1	Initial the unit
+26502	Note jam at SNVO2	Initial the unit
+26503	Note jam at SF15	Initial the unit
+26504	Note jam at ST01	Initial the unit
+26505	Note jam at ST02	Initial the unit
+26506	Note jam at ST02	Initial the unit
+26511	Notes in a wrong transport are detected by ST01 sensor	Initial the unit
+26512	RC5 reject too many notes continuously	Initial the unit
+26513	RC6 reject too many notes continuously	Initial the unit
+26514	RC7 reject too many notes continuously	Initial the unit
+26515	RC8 reject too many notes continuously	Initial the unit
+26516	RC9 reject too many notes continuously	Initial the unit
+26517	RC10 reject too many notes continuously	Initial the unit
+26518	RC5 reject too many notes in total	Initial the unit
+26519	RC6 reject too many notes in total	Initial the unit
+26520	RC7 reject too many notes in total	Initial the unit
+26521	RC8 reject too many notes in total	Initial the unit
+26522	RC9 reject too many notes in total	Initial the unit
+26523	RC10 reject too many notes in total	Initial the unit
+26524	RC5 dispensed notes that more than command required	Initial the unit
+26525	RC6 dispensed notes that more than command required	Initial the unit
+26526	RC7 dispensed notes that more than command required	Initial the unit
+26527	RC8 dispensed notes that more than command required	Initial the unit
+26528	RC9 dispensed notes that more than command required	Initial the unit
+26529	RC10 dispensed notes that more than command required	Initial the unit
+26530	RC5 dispensed notes that less than command required	Initial the unit
+26531	RC6 dispensed notes that less than command required	Initial the unit
+26532	RC7 dispensed notes that less than command required	Initial the unit
+26533	RC8 dispensed notes that less than command required	Initial the unit
+26534	RC9 dispensed notes that less than command required	Initial the unit
+26535	RC10 dispensed notes that less than command required	Initial the unit
+26536	AC2 status is abnormal	Initial the unit
+26537	AC2 "RC Settings" error (undefined parameter)	Initialize the module, and reset the parameter
+26538	RC5 "RC Settings" error (undefined parameter)	Initialize the module, and reset the parameter
+26539	RC6 "RC Settings" error (undefined parameter)	Initialize the module, and reset the parameter
+26540	RC7 "RC Settings" error (undefined parameter)	Initialize the module, and reset the parameter
+26541	RC8 "RC Settings" error (undefined parameter)	Initialize the module, and reset the parameter
+26542	RC9 "RC Settings" error (undefined parameter)	Initialize the module, and reset the parameter
+26543	RC10 "RC Settings" error (undefined parameter)	Initialize the module, and reset the parameter
+26544	AC2 "cassette type" error (undefined parameter)	Initialize the module, and reset the parameter
+26545	RC5 "cassette type" error (undefined parameter)	Initialize the module, and reset the parameter
+26546	RC6 "cassette type" error (undefined parameter)	Initialize the module, and reset the parameter
+26547	RC7 "cassette type" error (undefined parameter)	Initialize the module, and reset the parameter
+26548	RC8 "cassette type" error (undefined parameter)	Initialize the module, and reset the parameter
+26549	RC9 "cassette type" error (undefined parameter)	Initialize the module, and reset the parameter
+26550	RC10 "cassette type" error (undefined parameter)	Initialize the module, and reset the parameter
+26551	UE01 sensor error or ME01 does not rotate	Initial the unit
+26552	UE01 sensor error or ME02 is not rotate or UT01 error or NE transmission ratio cable is not connected	Initial the unit
+26553	NE transmission ratrio type verification erryr	Initial the unit
+26561	The unknown note arrives detected by  SE01	Initial the unit
+26566	The unknown note leaves detected by  SE01	Initial the unit
+26571	SE01 detects the unknown note arrives too early	Initial the unit
+26576	Note jam at SE01	Initial the unit
+26577	Note jam at SE02	Initial the unit
+26578	SE02 dispensing is blocked or notes are missed	Initial the unit
+26580	Roller dispensed more notes than the amount entered	Initial the unit
+26581	Tape is abnormal	Initial the unit
+26582	The tape of small roller is used up	Initial the unit
+26583	tape of large roller is run out but there is notes left in NE	Initial the unit
+26584	Roller dispensed much more notes than the amount entered	Initial the unit
+26585	NE jam clearing timeout	Initial the unit
+26586	No note exits in case of NE timeout	Initial the unit
+26587	No note that should exist in the escrow is detected to exit from the roller	Initial the unit
+26588	Note in escrow before audit	Initial the unit
+26589	RC11 SR01 detects the arrival of unknown notes	Initialize the module
+26590	RC12 SR01 detects the arrival of unknown notes	Initialize the module
+26591	RC13 SR01 detects the arrival of unknown notes	Initialize the module
+26592	RC14 SR01 detects the arrival of unknown notes	Initialize the module
+26593	RC15 SR01 detects the arrival of unknown notes	Initialize the module
+26594	RC16SR01 detects the arrival of unknown notes	Initialize the module
+26601	UD01 sensor error or MD01 does not rotate	Initial the unit
+26602	UD02 sensor error or MD02 does not rotate	Initial the unit
+26603	Note jam between  SD02 and SD03	Initial the unit
+26604	Note jam between SD03 and SD04	Initial the unit
+26605	Note jam between SD04 and SD05	Initial the unit
+26606	Note jam between SD05 and SD06	Initial the unit
+26607	Note jam between SD02 and RC2SR01 or are linked after passing SD01	Initial the unit
+26608	Note jam between SD03 and RC3SR01 or are linked after passing SD02	Initial the unit
+26609	Note jam between SD04 and RC4SR01 or are linked after passing SD03	Initial the unit
+26610	Note jam between SD05 and ACSR01 or are linked after passing SD04	Initial the unit
+26611	The unknown note arrives detected by  SD01	Initial the unit
+26612	The unknown note arrives detected by  SD02	Initial the unit
+26613	The unknown note arrives detected by  SD03	Initial the unit
+26614	The unknown note arrives detected by  SD04	Initial the unit
+26615	The unknown note arrives detected by  SD05	Initial the unit
+26616	The unknown note arrives detected by  SD06	Initial the unit
+26617	SD10 detects the arrival of unknown notes	Initialize the module
+26618	SD11 detects the arrival of unknown notes	Initialize the module
+26619	SD12 detects the arrival of unknown notes	Initialize the module
+26620	SD10 detects the early arrival of unknown notes	Initialize the module
+26621	The unknown note leaves detected by  SD01	Initial the unit
+26622	The unknown note leaves detected by SD02	Initial the unit
+26623	The unknown note leaves detected by SD03	Initial the unit
+26624	The unknown note leaves detected by SD04	Initial the unit
+26625	The unknown note leaves detected by SD05	Initial the unit
+26626	The unknown note leaves detected by SD06	Initial the unit
+26627	SD10 detects the leaving of unknown notes	Initialize the module
+26628	SD11 detects the leaving of unknown notes	Initialize the module
+26629	SD12 detects the leaving of unknown notes	Initialize the module
+26630	SD11 detects the early arrival of unknown notes	Initialize the module
+26631	SD01 detects the unknown note arrives too early	Initial the unit
+26632	SD02 detects the unknown note arrives too early	Initial the unit
+26633	SD03 detects the unknown note arrives too early	Initial the unit
+26634	SD04 detects the unknown note arrives too early	Initial the unit
+26635	SD05 detects the unknown note arrives too early	Initial the unit
+26636	SD06 detects the unknown note arrives too early	Initial the unit
+26637	Note jamming between SD05 and SD10	Initialize the module
+26638	Note jamming between SD10 and SD11	Initialize the module
+26639	Note jamming between SD11 and SD06	Initialize the module
+26640	Note jamming between SD04 and SD06	Initialize the module
+26641	Notes jaming or are linking between SD01 and RC1, SR01	Initial the unit
+26642	Notes jaming or are linking between SD01 and RC2, SR01	Initial the unit
+26643	Notes jaming or are linking between SD01 and AC, SR01	Initial the unit
+26644	Notes jaming or are linking between RC1, SR01 and SD01	Initial the unit
+26645	Notes jaming or are linking between RC2, SR01 and SD01	Initial the unit
+26646	Note jam between SD01 and SD02	Initial the unit
+26647	Note jam between SD02 and SD01	Initial the unit
+26648	Note jamming between SD05 and RC5SR01 or are linked after passing SD05	Initialize the module
+26649	Note jamming between SD10 and RC6SR01 or are linked after passing SD10	Initialize the module
+26650	Note jaming between SD11 and ACSR01 or are linked after passing SD11	Initial the unit
+26651	Note jam at SD01	Initial the unit
+26652	Note jam at SD02	Initial the unit
+26653	Note jam at SD03	Initial the unit
+26654	Note jam at SD04	Initial the unit
+26655	Note jam at SD05	Initial the unit
+26656	Note jam at SD06	Initial the unit
+26657	Note jamming in SD10	Initialize the module
+26658	Note jamming in SD11	Initialize the module
+26659	Note jamming in SD12	Initialize the module
+26660	SD12 detected that unknown notes arrived prematurely	Initial the unit
+26661	Notes in a wrong transport are detected by ACSR01	Initial the unit
+26662	Notes in a wrong transport are detected by RC1SR01	Initial the unit
+26663	Notes in a wrong transport are detected by RC2SR01	Initial the unit
+26664	Notes in a wrong transport are detected by RC3SR01	Initial the unit
+26665	Notes in a wrong transport are detected by RC4SR01	Initial the unit
+26666	Notes in a wrong transport are detected by ATCSR01	Initial the unit
+26667	Notes in a wrong transport are detected by SD02	Initial the unit
+26668	Notes in a wrong transport are detected by SD03	Initial the unit
+26669	Notes in a wrong transport are detected by SD04	Initial the unit
+26670	Notes in a wrong transport are detected by SD05	Initial the unit
+26671	Notes in a wrong transport are detected by SD06	Initial the unit
+26672	AC2-SR01 detected that notes entered wrong channel	Initial the unit
+26673	RC5-SR01 detected that notes entered wrong channel	Initial the unit
+26674	RC6-SR01 detected that notes entered wrong channel	Initial the unit
+26675	RC7-SR01 detected that notes entered wrong channel	Initial the unit
+26676	RC8-SR01 detected that notes entered wrong channel	Initial the unit
+26677	RC9-SR01 detected that notes entered wrong channel	Initial the unit
+26678	RC10-SR01 detected that notes entered wrong channel	Initial the unit
+26679	RC8 SR01 detected the arrival of unknown notes	Initial the unit
+26680	RC9 SR01 detected the arrival of unknown notes	Initial the unit
+26681	RC10 SR01 detected the arrival of unknown notes	Initial the unit
+26682	RC8 SR01 detected unknown note leaving	Initial the unit
+26683	RC9 SR01 detected unknown note leaving	Initial the unit
+26684	RC10 SR01 detected unknown note leaving	Initial the unit
+26685	RC8 SR01 detected that unknown notes arrived prematurely	Initial the unit
+26686	RC9 SR01 detected that unknown notes arrived prematurely	Initial the unit
+26687	RC10 SR01 detected that unknown notes arrived prematurely	Initial the unit
+26688	RC8 SR01 notes jammed	Shield the invalid cassette and then initialize unit
+26689	RC9 SR01 notes jammed	Shield the invalid cassette and then initialize unit
+26690	RC10 SR01 notes jammed	Shield the invalid cassette and then initialize unit
+26691	Notes in a wrong transport are detected in SD10	Initialize the module
+26692	Notes in a wrong transport are detected in SD11	Initialize the module
+26693	Notes in a wrong transport are detected in SD12	Initialize the module
+26694	Notes in a wrong transport are detected by RC11-SR01 sensor	Initialize the module
+26695	Notes in a wrong transport are detected by RC12-SR01 sensor	Initialize the module
+26696	Notes in a wrong transport are detected by RC13-SR01 sensor	Initialize the module
+26697	Notes in a wrong transport are detected by RC14-SR01 sensor	Initialize the module
+26698	Notes in a wrong transport are detected by RC15-SR01 sensor	Initialize the module
+26699	Notes in a wrong transport are detected by RC16-SR01 sensor	Initialize the module
+26701	The unknown note arrives detected by AC  SR01	Initial the unit
+26702	The unknown note arrives detected by RC1 SR01	Initial the unit
+26703	The unknown note arrives detected by RC2 SR01	Initial the unit
+26704	The unknown note arrives detected by RC3 SR01	Initial the unit
+26705	The unknown note arrives detected by RC4 SR01	Initial the unit
+26706	The unknown note arrives detected by ATC SR01	Initial the unit
+26707	AC2 SR01 detected the arrival of unknown notes	Initial the unit
+26708	RC5 SR01 detected the arrival of unknown notes	Initial the unit
+26709	RC6 SR01 detected the arrival of unknown notes	Initial the unit
+26710	RC7 SR01 detected the arrival of unknown notes	Initial the unit
+26711	The unknown note leaves detected by AC SR01	Initial the unit
+26712	The unknown note leaves detected by RC1 SR01	Initial the unit
+26713	The unknown note leaves detected by RC2 SR01	Initial the unit
+26714	The unknown note leaves detected by RC3 SR01	Initial the unit
+26715	The unknown note leaves detected by RC4 SR01	Initial the unit
+26716	The unknown note leaves detected by ATC SR01	Initial the unit
+26717	AC2 SR01 detected unknown note leaving	Initial the unit
+26718	RC5 SR01 detected unknown note leaving	Initial the unit
+26719	RC6 SR01 detected unknown note leaving	Initial the unit
+26720	RC7 SR01 detected unknown note leaving	Initial the unit
+26721	AC SR01 detects the unknown note arrives too early	Initial the unit
+26722	RC1 SR01 detects the unknown note arrives too early	Initial the unit
+26723	RC2 SR01 detects the unknown note arrives too early	Initial the unit
+26724	RC3 SR01 detects the unknown note arrives too early	Initial the unit
+26725	RC4 SR01 detects the unknown note arrives too early	Initial the unit
+26726	ATC SR01 detects the unknown note arrives too early	Initial the unit
+26727	AC2 SR01 detected that unknown notes arrived prematurely	Initial the unit
+26728	RC5 SR01 detected that unknown notes arrived prematurely	Initial the unit
+26729	RC6 SR01 detected that unknown notes arrived prematurely	Initial the unit
+26730	RC7 SR01 detected that unknown notes arrived prematurely	Initial the unit
+26731	Note jam at AC SR01	Initial the unit
+26732	Note jam at RC1 SR01	Shield the invalid cassette and then initialize unit
+26733	Note jam at RC2 SR01	Shield the invalid cassette and then initialize unit
+26734	Note jam at RC3 SR01	Shield the invalid cassette and then initialize unit
+26735	Note jam at RC4 SR01	Shield the invalid cassette and then initialize unit
+26736	Note jam at ATC SR01	Initial the unit
+26737	The AC2 SR01 note jammed	Shield the invalid cassette and then initialize unit
+26738	The RC5 SR01 note jammed	Shield the invalid cassette and then initialize unit
+26739	The RC6 SR01 note jammed	Shield the invalid cassette and then initialize unit
+26740	The RC7 SR01 note jammed	Shield the invalid cassette and then initialize unit
+26741	Pressing plate of AC error	Initial the unit
+26742	Pressing plate of RC1 error	Shield the invalid cassette and then initialize unit
+26743	Pressing plate of RC2 error	Shield the invalid cassette and then initialize unit
+26744	Pressing plate of RC3 error	Shield the invalid cassette and then initialize unit
+26745	Pressing plate of RC4 error	Shield the invalid cassette and then initialize unit
+26746	Pressing plate of ATC error	Initial the unit
+26748	Cassette AC pressing plate resetting timeout	Initial the unit
+26749	Cassette RC1 pressing plate resetting timeout	Shield the invalid cassette and then initialize unit
+26750	Cassette RC2 pressing plate resetting timeout	Shield the invalid cassette and then initialize unit
+26751	Cassette RC3 pressing plate resetting timeout	Shield the invalid cassette and then initialize unit
+26752	Cassette RC4 pressing plate resetting timeout	Shield the invalid cassette and then initialize unit
+26753	Cassette ATC pressing plate resetting timeout	Initial the unit
+26756	Cassette AC pressing plate raising timeout	Initial the unit
+26757	Cassette RC1 pressing plate raising timeout	Shield the invalid cassette and then initialize unit
+26758	Cassette RC2 pressing plate raising timeout	Shield the invalid cassette and then initialize unit
+26759	Cassette RC3 pressing plate raising timeout	Shield the invalid cassette and then initialize unit
+26760	Cassette RC4 pressing plate raising timeout	Shield the invalid cassette and then initialize unit
+26761	Cassette ATC pressing plate raising timeout	Initial the unit
+26762	AC pressing plate of cassette failed to decline	Initial the unit
+26763	RC1 pressing plate of cassette failed to decline	Shield the invalid cassette and then initialize unit
+26764	AC internal solenoid of cassette failed to power on	Shield the invalid cassette and then initialize unit
+26765	RC1 internal solenoid of cassette failed to power on	Shield the invalid cassette and then initialize unit
+26766	RC2 internal solenoid of cassette failed to power on	Shield the invalid cassette and then initialize unit
+26767	RC3 internal solenoid of cassette failed to power on	Shield the invalid cassette and then initialize unit
+26768	RC4 internal solenoid of cassette failed to power on	Shield the invalid cassette and then initialize unit
+26769	ATC internal solenoid of cassette failed to power on	Initial the unit
+26770	RC2 pressing plate of cassette failed to decline	Shield the invalid cassette and then initialize unit
+26771	AC solenoid failed to release	Shield the invalid cassette and then initialize unit
+26772	RC1 solenoid failed to release	Shield the invalid cassette and then initialize unit
+26773	RC2 solenoid failed to release	Shield the invalid cassette and then initialize unit
+26774	RC3 solenoid failed to release	Shield the invalid cassette and then initialize unit
+26775	RC4 solenoid failed to release	Shield the invalid cassette and then initialize unit
+26776	ATC solenoid failed to release	Initial the unit
+26777	RC3 pressing plate of cassette failed to decline	Shield the invalid cassette and then initialize unit
+26778	RC4 pressing plate of cassette failed to decline	Shield the invalid cassette and then initialize unit
+26779	ATC pressing plate of cassette failed to decline	Initial the unit
+26780	AC motor error	Shield the invalid cassette and then initialize unit
+26781	RC1 motor error	Shield the invalid cassette and then initialize unit
+26782	RC2 motor error	Shield the invalid cassette and then initialize unit
+26783	RC3 motor error	Shield the invalid cassette and then initialize unit
+26784	RC4 motor error	Shield the invalid cassette and then initialize unit
+26785	ATC motor error	Initial the unit
+26788	Wing-wheel of AC is error	Shield the invalid cassette and then initialize unit
+26789	Wing-wheel of RC1 is error	Shield the invalid cassette and then initialize unit
+26790	Wing-wheel of RC2 is error	Shield the invalid cassette and then initialize unit
+26791	Wing-wheel of RC3 is error	Shield the invalid cassette and then initialize unit
+26792	Wing-wheel of RC4 is error	Shield the invalid cassette and then initialize unit
+26793	Wing-wheel of ATC is error	Initial the unit
+26796	RC1 fail to separate notes	Shield the invalid cassette and then initialize unit
+26797	RC2 fail to separate notes	Shield the invalid cassette and then initialize unit
+26798	RC3 fail to separate notes	Shield the invalid cassette and then initialize unit
+26799	RC4 fail to separate notes	Shield the invalid cassette and then initialize unit
+26800	ATC fail to separate notes	Initial the unit
+26803	AC non-existence	Initial the unit
+26804	RC1 non-existence	Shield the sipensing function of the invalid cassette and then initial the unit
+26805	RC2 non-existence	Shield the sipensing function of the invalid cassette and then initial the unit
+26806	RC3 non-existence	Shield the sipensing function of the invalid cassette and then initial the unit
+26807	RC4 non-existence	Shield the sipensing function of the invalid cassette and then initial the unit
+26808	ATC non-existence	Audit process is not available, initialize the unit
+26810	AC is full	Stop service
+26811	RC1 is full	Audit process is not available, initialize the unit
+26812	RC2 is full	Audit process is not available, initialize the unit
+26813	RC3 is full	Audit process is not available, initialize the unit
+26814	RC4 is full	Audit process is not available, initialize the unit
+26815	ATC is full	Audit process is not available, initialize the unit
+26818	RC1 is empty, but the withdrawn notes do not reach the specified quantity	Initial the unit
+26819	RC2 is empty, but the withdrawn notes do not reach the specified quantity	Initial the unit
+26820	RC3 is empty, but the withdrawn notes do not reach the specified quantity	Initial the unit
+26821	RC4 is empty, but the withdrawn notes do not reach the specified quantity	Initial the unit
+26822	ATC is empty, but the withdrawn notes do not reach the specified quantity	Initial the unit
+26825	Too much notes are rejected successively by RC1	Shield the defective cassette
+26826	Too much notes are rejected successively by RC2	Shield the defective cassette
+26827	Too much notes are rejected successively by RC3	Shield the defective cassette
+26828	Too much notes are rejected successively by RC4	Shield the defective cassette
+26829	Too much notes are rejected successively by ATC	Shield the defective cassette
+26832	Too much notes have been rejected by RC1	Shield the defective cassette
+26833	Too much notes have been rejected by RC2	Shield the defective cassette
+26834	Too much notes have been rejected by RC3	Shield the defective cassette
+26835	Too much notes have been rejected by RC4	Shield the defective cassette
+26836	Too much notes have been rejected by NV	Initial the unit
+26837	“DC cassette currency” setting error of AC	Initial the unit
+26838	“DC cassette currency” setting error of RC1	Initial the unit
+26839	Notes from RC1 above the specified number	Initial the unit
+26840	Notes from RC2 above the specified number	Initial the unit
+26841	Notes from RC3 above the specified number	Initial the unit
+26842	Notes from RC4 above the specified number	Initial the unit
+26843	Notes from ATC above the specified number	Initial the unit
+26846	Notes from RC1 below the specified number	Initial the unit
+26847	Notes from RC2 below the specified number	Initial the unit
+26848	Notes from RC3 below the specified number	Initial the unit
+26849	Notes from RC4 below the specified number	Initial the unit
+26850	Notes from ATC below the specified number	Initial the unit
+26851	“DC cassette currency” setting error of RC2	Initial the unit
+26852	“DC cassette currency” setting error of RC3	Initial the unit
+26853	“DC cassette currency” setting error of RC4	Initial the unit
+26854	Notes from the roller do not enter the cassette during deposit	Initial the unit
+26855	AC box  abnormal	Initial the unit
+26856	“RC setting” parameter error of AC	Initial the unit
+26857	“RC setting” parameter error of RC1	Initial the unit
+26858	“RC setting” parameter error of RC2	Initial the unit
+26859	“RC setting” parameter error of RC3	Initial the unit
+26860	“RC setting” parameter error of RC4	Initial the unit
+26861	LRB non-existence	Stop service
+26862	LRB status abnormal (the error code is re-enabled)	Stop service
+26863	“RC setting” parameter error of ATC	Initial the unit
+26864	“Cassette type” setting error of AC	Initial the unit
+26865	“Cassette type” setting error of RC1	Initial the unit
+26866	“Cassette type” setting error of RC2	Initial the unit
+26867	“Cassette type” setting error of RC3	Initial the unit
+26868	“Cassette type” setting error of RC4	Initial the unit
+26869	“Cassette type” setting error of ATC	Initial the unit
+26870	Notes with different denominations are dispensed from RC cassette during audit	Initial the unit
+26871	Number of withdrawn notes above the specified number	Cancel the transaction and initialize the unit
+26872	Number of withdrawn notes below the specified number	Cancel the transaction and initialize the unit
+26873	note count qualified note does not match sensor count.	Cancel the transaction, Initialize the unit.
+26874	Withdrawal of eligible notes is not consistent with sensor count.	Cancel the transaction, Initialize the unit.
+26875	Deposit RC1 qualified note does not match sensor count.	Cancel the transaction, Initialize the unit.
+26876	Deposit RC2 note does not match sensor count.	Cancel the transaction, Initialize the unit.
+26877	Deposit RC3 qualified note does not match sensor count.	Cancel the transaction, Initialize the unit.
+26878	Deposit RC4 qualified note does not match sensor count.	Cancel the transaction, Initialize the unit.
+26879	Audit RC1 qualified notes do not match sensor counts.	Cancel the transaction, Initialize the unit.
+26880	Audit RC2 qualified notes do not match sensor counts.	Cancel the transaction, Initialize the unit.
+26881	Audit RC3 qualified notes do not match sensor counts.	Cancel the transaction, Initialize the unit.
+26882	Audit ATC qualified notes do not match sensor counts.	Cancel the transaction, Initialize the unit.
+26883	Uneven deposit account.	Cancel the transaction, Initialize the unit.
+26884	Withdrawals RC1 accounts are not fair.	Cancel the transaction, Initialize the unit.
+26885	Withdrawal RC2 accounts are not fair.	Cancel the transaction, Initialize the unit.
+26886	Withdrawal RC3 accounts are not fair.	Cancel the transaction, Initialize the unit.
+26887	Withdrawals RC4 accounts are not fair.	Cancel the transaction, Initialize the unit.
+26888	Uneven audit accounts.	Cancel the transaction, Initialize the unit.
+26889	Audit of RC1 accounts irregularities.	Cancel the transaction, Initialize the unit.
+26890	Audit of RC2 accounts irregularities.	Cancel the transaction, Initialize the unit.
+26891	Audit of RC3 accounts irregularities.	Cancel the transaction, Initialize the unit.
+26892	Audit of ATC accounts.	Cancel the transaction, Initialize the unit.
+26893	Unbalance of retract account	Cancel the transaction, Initialize the unit.
+26894	Counting accounts are inconsistent	Cancel the transaction and initialize the module
+26895	Withdrawal accounts are inconsistent	Cancel the transaction and initialize the module
+26911	Firmware download, fail to get updated file version information	Check if the updating package configuration file is correct, check if firmware and version is correct
+26912	Firmware download, fail to download the required version of firmware	Check if the updating package configuration file is correct, check if firmware and version is correct
+26913	Firmware download, fail to open downloaded file	Check if the updating package configuration file is correct, check if firmware and version is correct
+26914	Firmware download, fail to read downloaded file	Check if the updating package configuration file is correct, check if firmware and version is correct
+26915	Firmware download, response is not match with command BL parameter	Hardware communication error, try again
+26916	After firmware download, fail to get version information or version is not same with command required	Check if firmware and version is correct, and try again
+26917	Firmware download, data verification error	Hardware communication error, try again
+26918	Firmware download, NV self-check failed	Hardware communication error, try again
+26919	Firmware download, send or receive data error	Hardware communication error, try again
+26920	Firmware download, fail to send data	Hardware communication error, try again
+26921	Firmware download, CRC verification error	Hardware communication error, try again
+26922	Firmware download, program verification error	Check if firmware is correct
+26923	Firmware download, section clear failed	Hardware communication error, try again
+26924	Firmware download, programming failed	Hardware communication error, try again
+26925	Firmware download, no certain type nodes information exist in firmware configuration file	Check if firmware configuration file is correct
+26926	Security firmware updating, the security firmware cannot update to non-security firmware	Check if the updating package configuration file is correct, check if firmware and version is correct
+26927	Security firmware updating, fail to open verification file	Check if the verification file of download updating package is correct
+26928	Security firmware updating, fail to read verification file	Check if the verification file of download updating package is correct
+26929	Security firmware updating, encryption error	Check if the verification file of download updating package is correct and if firmware is correct
+26930	Security download information is not get	Adjust the download command progress
+26977	Function is not exist	Check if driver version is correct
+26978	SP report cassette plug error code	Wrong SP driver error, initial again
+26980	Non-core safety version firmware.	Check if the firmware version is correct.
+26981	Security audit error in note issuing scenario.	Retry.
+26982	Failed to update Secgroup work key	Try again
+26983	Failed to check data packet MAC	Retry
+26984	Data packet ID checking failed	Update software
+26985	Number of actually dispensed notes is inconsistent with requested number	Hardware problem, contact supplier
+26986	Receiving or sending data in blacklist feature packet failed	Update software
+26987	Verification error in blacklist data is reported	Update software
+26988	Error in parameters of blacklist mode or protocol version	Update software
+26989	Data receiving error or timeout	Update software
+26990	Amount of blacklist serial numbers is abnormal	Retry
+26991	Other error	Software problem, contact supplier
+26992	Configuration error	Configuration error, contact supplier
+26993	Response failed to meet the command	Update software
+26994	CRC checking failed	Update software
+26995	Response receiving failed (no data is received or data packet format is wrong)	Update software
+26996	Fail to receive ACK (no data is received or illegal data is received)	Check for abnormal connection to communication cable of main control board or abnormality of communication configuration
+26997	Fail to send ENQ	Check for abnormal connection to communication cable of main control board or abnormality of communication configuration
+26998	Fail to send command	Check for abnormal connection to communication cable of main control board or abnormality of communication configuration
+26999	Fail to initialize component	Check for abnormal connection to communication cable of main control board or abnormality of communication configuration

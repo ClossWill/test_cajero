@@ -1,0 +1,763 @@
+
+
+===== PAGINA 1 =====
+CRM9250NDev API Description
+Content
+1InstructionsforUse..........................................................................................................................3
+2APIstatuscode.................................................................................................................................4
+3Datastructure...................................................................................................................................5
+eCRM9250N_SubType...............................................................................................................5
+3.1tDevReturn............................................................................................................................5
+3.2tCRM9250N_InitSettingEx..................................................................................................5
+3.3tCRM9250N_InOutUnitsInfoEx..........................................................................................6
+3.4tCRM9250N_InitInfoEx.......................................................................................................6
+3.5tCRM9250N_CassetteInfoEx...............................................................................................6
+3.6tCRM9250N_BinInfo...........................................................................................................7
+3.7tCRM9250N_CassetteStatusEx............................................................................................7
+3.8tCRM9250N_BinStatus........................................................................................................7
+3.9tCRM9250N_DevStatusEx..................................................................................................8
+3.10tCRM9250N_DenomAndNum...........................................................................................8
+3.11tCRM9250N_DenomNumInfo...........................................................................................9
+3.12tCRM9250N_CashCount....................................................................................................9
+3.13tCRM9250N_StoreMoneyEx...........................................................................................10
+3.14tCRM9250N_CancelDepositEx.......................................................................................10
+3.15tCRM9250N_DispenseInfoEx.........................................................................................10
+3.16tCRM9250N_RetractInfoEx.............................................................................................11
+eCRM9250N_RetractPos..........................................................................................................11
+3.17tCRM9250N_DenominationInfo......................................................................................12
+3.18tGRGNoteGoDest.............................................................................................................12
+3.19tGRGNoteDetails..............................................................................................................12
+3.20tGRGSegSnData...............................................................................................................13
+3.21tGRGSegOneSnInfo.........................................................................................................13
+3.22tGRGNoteOCRInfo..........................................................................................................13
+3.23tCRM9250N_PDLProgress..............................................................................................14
+3.24tCRM9250N_DevVersionInfoEx.....................................................................................14
+3.25tCRM9250N_DenominationTable...................................................................................15
+3.26tCRM9250N_LastInOutUnitsInfo....................................................................................15
+3.27tCRM9250N_DenomDetails............................................................................................15
+3.28tCRM9250N_ReqDispInfo...............................................................................................15
+4API.................................................................................................................................................16
+4.1hOpenLogicDevice.............................................................................................................16
+4.2vCloseLogicDevice.............................................................................................................16
+4.3iSetCommPara....................................................................................................................16
+4.4iCloseComm.......................................................................................................................16
+4.5iInitSettingEx......................................................................................................................17
+4.6iInitEx.................................................................................................................................17
+4.7iGetCassetteInfoEx.............................................................................................................17
+
+===== PAGINA 2 =====
+4.8iSetCassetteInfoEx..............................................................................................................17
+4.9iPowerOnInitEx..................................................................................................................18
+4.10iGetDevStatusEx...............................................................................................................18
+4.11iGetLastDevStatusEx........................................................................................................18
+4.12iPrepareNextTransaction..................................................................................................19
+4.13iPrepareDeposit.................................................................................................................19
+4.14iOpenShutter.....................................................................................................................19
+4.15iCloseShutter.....................................................................................................................19
+4.16iGetLastTranDetail...........................................................................................................20
+4.17iCashCount.......................................................................................................................20
+4.18iStoreMoneyEx.................................................................................................................20
+4.19iCancelDepositEx.............................................................................................................21
+4.20iDispenseEx......................................................................................................................21
+4.21iRetractEx.........................................................................................................................21
+4.22iGetDenominationTable....................................................................................................21
+4.23iGetNvConnected.............................................................................................................22
+4.24iGetNvNotesInfoEx..........................................................................................................22
+4.25iFirmwareDownload.........................................................................................................23
+4.26iGetCurFileProgress.........................................................................................................23
+4.27iGetDevVersionEx............................................................................................................23
+4.28iGetCassetteDenomDetailsEx..........................................................................................23
+5RecommendedFlow......................................................................................................................24
+5.1Poweron.............................................................................................................................24
+5.2Dispense..............................................................................................................................25
+5.3Deposit................................................................................................................................26
+
+===== PAGINA 3 =====
+1 Instructions for Use
+1.1 driver+dunite
+WhendeveloperuseGRG'sSDKortoolplus,developerneedtoinstalltheDuniteplatformand
+GRGUSBDriverfirst.
+1.2 Alldlland.inifileshouldbeusedtogetherinthesamedirectory.CRM9250NDev.dllisthe
+maindll.
+1.3 GRGDTATM_CommCfg.ini isusedtoconfigurethecommunicationmode.
+CommType=3 //1-COM;3-USB.
+ComID=2 //Serialportnumber,ThisvalueisinvalidforUSBcommunication.
+1.4 ThegeneralformatofAPI.
+intiCommandName(HANDLEp_hDevHandle,(……),tDevReturn*p_psStatus);
+ReturnedvalueofAPI. SUCCESS:0orFAIL:1(ornon-zero).
+Note:p_psStatusmayreturnawarningcodeevenifSUCCESS:0isreturned.
+Codeexample:
+tDevReturnl_sStatus[8]={0};
+intret=iCommandName((……),l_sStatus);
+Note:tDevReturnmustbearraysize8，tDevReturn.iLogicCode(ReferenceAPIstatuscode).
+1.5 WhentheAPPcallsDLL,Logfileswillbegenerated.WhenyouhaveSDKproblems,send
+Log(DevDriverLogfile+CRM9250NLogfile)toGRGforanalysisandspecifythetimepoint.
+
+===== PAGINA 4 =====
+2 API status code
+Statuscodesaredividedintophysicalcodesandlogicalcodes.Physicalcodereferstothereal
+returncodeofthedevice,whichdescribesaspecificrealstateofthedevice.Logicalcoderefersto
+thereturncodeafteranalysisandclassificationofphysicalcodes,reflectingacertaintypeof
+devicestatuswiththesamenature.Therelationshipbetweenthemisthatalogicalcodemay
+correspondtomultiplephysicalcodes,oritmaybeaone-to-onecorrespondence.
+TheiLogicCodeoftDevReturnisrequiredforsoftwaredevelopment.
+Refertodoc 《CRM9250NLogicalCode.xls》
+
+===== PAGINA 5 =====
+3 Data structure
+eCRM9250N_SubType
+typedefenum
+{
+CRM9250N_SUBTYPE_UNKNOWN=0,//Unknownmodel
+CRM9250N_SUBTYPE_A='A', //CRM9250NModel-A
+CRM9250N_SUBTYPE_B='B', //Model-B
+CRM9250N_SUBTYPE_C='C', //Model-C(4RCslot+1ACslot+LRB)
+CRM9250N_SUBTYPE_D='D', //Model-D(2DRCslot+1ACslot+LRB)
+CRM9250N_SUBTYPE_E='E' //Model-E
+}eCRM9250N_SubType;
+3.1 tDevReturn
+typedefstruct
+{
+int iLogicCode; //Logicalcode
+int iPhyCode; //Physicalcode
+int iHandle; //Handlingmethods:0-No1-Initializing2-resend
+int iType; //Statuscodetype:0-Warning1-Error
+characDevReturn[128]; //Reserve
+characReserve[128]; //Reserve
+}tDevReturn;
+3.2 tCRM9250N_InitSettingEx
+typedefstructtCRM9250N_InitSettingEx
+{
+BYTE abyCassetteDisable[16];//[in]Disableeachcasette(RC1-RC16)0-Enable1-Disable
+WORD awAcceptableDenom[256];//[in]AcceptabledenominationID(empty:allnot
+accepted)
+charcSubType; //[out]Machinemodel-eCRM9250N_SubType
+BYTE byAtcMode; //[in]ATCmode:0-onlyaudit;1-auditandRC
+BYTE abyDRCCassetteCfg[16]; //[in]DRCslotconfiguration
+BYTE byAcMode;//[in]ACmode:0-usedasAC;1-usedasRC(Onlysupportedby
+CRM9250NModel-D)
+
+===== PAGINA 6 =====
+BYTE byWorkingMode; //[in]Set0-CRMMachineMode
+BYTE byDcAccepetAllDenom; //[in]Set1-Receivealldenominationsinthe
+"awAcceptableDenom"
+BYTE byInitCfg;//[in]Set0-Normalmode.Duringinitialization,checktheACbox.
+BYTE abyReserved[17]; //Reserved
+}tCRM9250N_InitSettingEx;
+3.3 tCRM9250N_InOutUnitsInfoEx
+Apositivenumbermeansinandanegativenumbermeansout
+typedefstructtCRM9250N_InOutUnitsInfoEx
+{
+int aiRcInOutNum[16]; //[out]Thenumberofnotesin/outofRC(RC1-RC16)
+int iAcInOutNum[2]; //[out]Thenumberofnotesin/outofAC
+int iLrbInOutNum; //[out]Thenumberofnotesin/outofLRB
+int iAtcInOutNum; //[out]Thenumberofnotesin/outofATC
+int iNeInOutNum; //[out]Thenumberofnotesin/outofNE
+int iNfInOutNum;//[out]Thenumberofnotesin/outofNF
+BYTE abyReserved[32]; //Reserved
+}tCRM9250N_InOutUnitsInfoEx;
+3.4 tCRM9250N_InitInfoEx
+typedefstructtCRM9250N_InitInfoEx
+{
+tCRM9250N_InOutUnitsInfoEx sInOutUnitsInfo;//[out]Thenumberofnotesin/outof
+eachcomponent(inaccuracy)
+BYTE byMode; //set0-normalspeed
+BYTE byNEMode; //set0-Duringinitialization,NEremovesthenotes.
+BYTE abyReserved[30];//Reserved
+}tCRM9250N_InitInfoEx;
+3.5 tCRM9250N_CassetteInfoEx
+typedefstruct tCRM9250N_CassetteInfoEx
+{
+BYTE abyCassetteDisable[16];//[in]Disableeachcasette(RC1-RC16)0-Enable1-
+Disable
+tCRM9250N_BinInfo sAcCassette[2]; //ACcassetteinformation
+tCRM9250N_BinInfo sAtcCassette; //ATCcassetteinformation
+
+===== PAGINA 7 =====
+tCRM9250N_BinInfo asRcCassette[16];//RC&DCcassetteinformation
+BYTE abyReserved[32]; //Reserved
+}tCRM9250N_CassetteInfoEx;
+3.6 tCRM9250N_BinInfo
+typedefstructtCRM9250N_BinInfo
+{
+BYTE abyLogID[8]; //CassettelogicID
+BYTE byCountryCode; //Reserved
+BYTE byCassetteType;
+//Cassettetype:1-RC&ATC,2-AC,3-DC,4-NRC,5-NDC,6-DRC,9-DAC
+WORD wNoteType;//Cassettedenomination.ForRCisthedenominationcode;
+MeaninglessforAC;Mustbe0xFFF0forDC
+BYTE byFunction; //CassettefunctionforRC:0x00-loopfunction,0xF0onlydispense
+0xFF-onlystore;mustbe0xF3forATC;mustbe0xF2forAC;mustbe0xF1forDC
+BYTE byStoreType;//0-RCdepositsaccordingtodenomination
+WORD wRCAsDC;//0x8000-RCisusedasDC(byFunctionmustbeF1);0-bydefault
+BYTE abyReserved[30];//Reserved
+}tCRM9250N_BinInfo;
+3.7 tCRM9250N_CassetteStatusEx
+typedefstructtCRM9250N_CassetteStatusEx
+{
+tCRM9250N_BinStatus asRcStatus[16]; //[out]RCstatus.RC1-RC16
+tCRM9250N_BinStatus sAtcStatus; //[out]ATCstatus
+tCRM9250N_BinStatus sAcStatus[2]; //[out]ACstatus
+tCRM9250N_BinStatus sLrbStatus;
+//[out]LRBstatus,byExist(effective),byStatus(reserved)
+}tCRM9250N_CassetteStatusEx;
+3.8 tCRM9250N_BinStatus
+typedefstruct tCRM9250N_BinStatus
+{
+BYTE byStatus;//[out]Cassettestatus:0-Normal1-Full2-willbefull3-willbeempty4-
+empty255-Abnormal
+BYTE byExist;//[out]Cassetteexists:0-doesnotexist1-exists
+}tCRM9250N_BinStatus;
+
+===== PAGINA 8 =====
+3.9 tCRM9250N_DevStatusEx
+typedefstructtCRM9250N_DevStatusEx
+{
+BYTE byShutterAreaHasNotes;//[out]Whethertheshutterareahasnote.0-No1-Yes
+BYTE byNfHasNotes; //[out]WhethertheNFhasnote.0-No1-Yes
+BYTE byNfNotesWrongPosition; //[out]WhetherthenotesofNFareplaced
+correctly.0-positioncorrect;1-positionincorrect
+BYTE byNeHasNotes; //[out]WhetherNEhasnotes:0-No,1-Yes
+BYTE byShutterOpen; //[out]Whethertheshutterisopen.0-closed1-open
+BYTE byNvOpen; //[out]NVStatus.0-closed1-open
+BYTE byLowerChannelOpen; //[out]LowerChannestatus.0-closed1-open
+BYTE byUpperUnitDragOut; //[out]Upperunit.0-Pushin;1-Dragout
+BYTE byUpperUnitInPos; //[out]Upperunit.0-Notinplace1-inplace
+BYTE byLowerUnitDragOut; //[out]Lowerunit.0-Pushin;1-Dragout
+BYTE byLowerUnitInPos; //[out]Lowerunit.0-Notinplace1-inplace
+BYTE byCassettePlugRemove; //[out]Thecassetteisinserted/pulledout.0-No
+1-Yes;Ifacassetteisinserted/pulledout,needtocall"iGetCassetteInfoEx",andthenthisbit
+becomes0
+tCRM9250N_CassetteStatusEx sCassetteStatus; //[out]Cassettestatus
+BYTE abyDevStatusInfo[30]; //[out]Devicestatusinformation7bytesretained.
+BYTE abySensorStatusInfo[45]; //[out]Sensorstatus
+BYTE byRC1PlugRemove; //TheRC1isinserted/pulledout.0-No1-Yes
+BYTE byRC2PlugRemove; //TheRC2isinserted/pulledout.0-No1-Yes
+BYTE byRC3PlugRemove; //TheRC3isinserted/pulledout.0-No1-Yes
+BYTE byRC4PlugRemove; //TheRC4isinserted/pulledout.0-No1-Yes
+BYTE byACPlugRemove; //TheACisinserted/pulledout.0-No1-Yes
+BYTE byATCPlugRemove; //TheATCisinserted/pulledout.0-No1-Yes
+BYTE bySpeedStrategy; //0-normal
+BYTE byRC9PlugRemove; //TheRC9isinserted/pulledout.0-No1-Yes
+BYTE byRC10PlugRemove; //TheRC10isinserted/pulledout.0-No1-Yes
+BYTE byRC11PlugRemove; //TheRC11isinserted/pulledout.0-No1-Yes
+BYTE byRC12PlugRemove; //TheRC12isinserted/pulledout.0-No1-Yes
+BYTE byAC2PlugRemove; //TheAC2isinserted/pulledout.0-No1-Yes
+BYTE byOutPosHasNotes; //TheNF-Outletexporthasnotes
+BYTE abyReserved[19]; //Reserved
+}tCRM9250N_DevStatusEx;
+3.10 tCRM9250N_DenomAndNum
+typedefstructtCRM9250N_DenomAndNum
+
+===== PAGINA 9 =====
+{
+WORD wCode; //[out]NotedenominationID
+int iNum; //[out]Thenumberofnote
+}tCRM9250N_DenomAndNum;
+3.11 tCRM9250N_DenomNumInfo
+typedefstructtCRM9250N_DenomNumInfo
+{
+tCRM9250N_DenomAndNum asDenomNumL4A[256];//[out]ECB-4Anote
+denominationandquantityinformation,otherwiseretained，Otherwise,itrepresentsallthenote
+denominationandquantityinformation
+tCRM9250N_DenomAndNum asDenomNumL4B[256];//[out]ECB-4Bnote
+denominationandquantityinformation,otherwiseretained
+tCRM9250N_DenomAndNum asDenomNumL3[256];//[out]ECB-L3note
+denominationandquantityinformation,otherwiseretained
+tCRM9250N_DenomAndNum asDenomNumL2[256];//[out]ECB-L2note
+denominationandquantityinformation,otherwiseretained
+tCRM9250N_DenomAndNum asDenomNumReserved1[256];//[out]Reserved
+tCRM9250N_DenomAndNum asDenomNumReserved2[256];//[out]Reserved
+int iUnknownCount; //[out]Numberofunidentifiednotes
+}tCRM9250N_DenomNumInfo;
+3.12 tCRM9250N_CashCount
+typedefstructtCRM9250N_CashCount
+{
+int iDepositLimit;//[in]Depositlimit,ifvalue<=0,inifileshallprevail
+WORD awUnacceptableDenom[256];//[in]UnacceptabledenominationID(empty:all
+accepted),onlythiscountisvalid
+int iTotalCount;//[out]Thiscountingoperation,thenumberofnotesenteringNE,accurate
+int iRejectCount; //[out]Thenumberofrejectednotesinthiscountingoperation,inaccuracy
+tCRM9250N_DenomNumInfo sDenomNumInfo;//[out]Informationaboutthenotes
+enteringNE
+DWORD dwAmountLimit; //[in]Depositamountlimit
+BYTE abyReserved[28]; //Reserved
+}tCRM9250N_CashCount;
+
+===== PAGINA 10 =====
+3.13 tCRM9250N_StoreMoneyEx
+typedefstructtCRM9250N_StoreMoneyEx
+{
+BYTE abyCassetteDisable[16];//[in]Disableeachcasette(RC1-RC16)0-Enable1-
+Disable
+BYTE abyCassettePriority[16];//[in]RCpriority(RC1-RC16),0x01-0x0F,wherelower
+valueshavehigherpriority
+WORD awUnacceptableDenom[256];//[in]UnacceptabledenominationID(empty:all
+accepted),onlythisStoreMoneyisvalid
+tCRM9250N_InOutUnitsInfoEx sInOutUnitsInfo;//[out]Thenumberofnotesin/outofeach
+component(inaccuracy)
+tCRM9250N_DenomNumInfo sDenomNumInfo; //[out]Informationofnotes
+depositedintothecassettes
+BYTE byRejectPos; //[in]Depositrejectionconfiguration1:AC1,2:AC2,3:LRB
+BYTE byNvMode; //[in]0-Verification(default) 1-Noverification
+BYTE abyReserved[30];//Reserved
+}tCRM9250N_StoreMoneyEx;
+3.14 tCRM9250N_CancelDepositEx
+typedefstructtCRM9250N_CancelDepositEx
+{
+tCRM9250N_InOutUnitsInfoEx sInOutUnitsInfo; //[out]Thenumberofnotesin/outof
+eachcomponent(inaccuracy)
+tCRM9250N_DenomNumInfo sDenomNumInfo; //[out]Informationofnotesentering
+thecassettes(onlymeaningfulifthedeviceisperformingECB)
+BYTE abyReserved[32]; //Reserved
+}tCRM9250N_CancelDepositEx;
+3.15 tCRM9250N_DispenseInfoEx
+typedefstructtCRM9250N_DispenseInfoEx
+{
+BYTE byDispType; //[in]set=1-DispensebyRC
+tCRM9250N_ReqDispInfo asReqDispInfo[16]; //[in]Requestdispenseinformation
+BYTE abyCassetteDisable[16]; //[in]Disableeachcasette(RC1-RC16)0-Enable1-
+Disable
+int iTotalCount; //[out]NumberofnotesdispensetoNF,accurate
+tCRM9250N_DenomAndNum asDenomNum[256]; //[out]Informationofnotes
+dispensetoNF
+
+===== PAGINA 11 =====
+int aiDispensedInfo[16];//[out]ThenumberofnotesdispensefromeachRCtoNFmaybe
+inaccurate(RC1-RC16)
+int aiRejectInfo[16]; //[out]ThenumberofrejectednotesineachRC,maybeinaccurate
+(RC1-RC16)
+tCRM9250N_InOutUnitsInfoEx sInOutUnitsInfo; //[out]Thenumberofnotesin/outof
+eachcomponent,iNfInOutNumaccurate,aiRcInOutNummaynotbeaccurate
+BYTE byNFNotesPolicy; //Reserved，set=0
+BYTE byRejectToAc; //[in]1-AC1,2-AC2,3-LRBSelectthedestinationofdispense
+rejection
+BYTE byCountEnable;//[in]0-Dispensefunction,1-cleaningmachinefunction
+BYTE byCountError;//[in]Errorifthenumberofnotesisinsufficientwhen
+Dispense.(statuscode)0-Error;1-Warning;
+BYTE byCountNVPolicy; //[in]0-EnableNVidentification;1-DisableNVidentification
+BYTE abyReserved[28]; //Reserved
+}tCRM9250N_DispenseInfoEx;
+3.16 tCRM9250N_RetractInfoEx
+typedefstructtCRM9250N_RetractInfoEx
+{
+BYTE byRetractType; //[in]1-RetractNF.2-RetractNE
+BYTE byRetractPos; //[in]Thedestinationoftheretract,seeeCRM9250N_RetractPos
+BYTE abyCassetteDisable[16];//[in]DisableeachRC(RC1-RC16)0-Enable1-Disable
+BYTE abyCassettePriority[16];//[in]RCpriority(RC1-RC16),value0x01-0x0Fthelower
+thenumber,thehigherthepriority
+int iTotalCount; //[out]Thenumberofretractnotes,whichmaybeinaccurate
+tCRM9250N_DenomNumInfo sDenomNumInfo; //[out]Thedenominationandquantity
+informationoftheretractnote
+tCRM9250N_InOutUnitsInfoEx sInOutUnitsInfo; //[out]Thenumberofnotesin/outof
+eachcomponent,maybeinaccurate
+BYTE abyRetractFlag;//[in]set0
+BYTE abyReserved[31]; //Reserved
+}tCRM9250N_RetractInfoEx;
+eCRM9250N_RetractPos
+typedefenum
+{
+RETRACT_POS_LRB =1, //AllnotesareretractedtoLRB
+RETRACT_POS_AC =2, //AllnotesareretractedtoAC
+RETRACT_POS_NE =3, //AllnotesareretractedtoNE
+RETRACT_POS_AC2 =4, //AllnotesareretractedtoAC2
+
+===== PAGINA 12 =====
+RETRACT_POS_RC =5, //AllnotesareretractedtoRC,butunqualifiednotesgointoAC
+RETRACT_POS_ACEX=6,//AllnotesareretractedtoextensionAC
+RETRACT_POS_DC =7, //AllnotesareretractedtoDC
+RETRACT_POS_RCLRB=8 //AllnotesareretractedtoRC,butunqualifiednotesgo
+intoLRB
+}eCRM9250Ns_RetractPos;
+3.17 tCRM9250N_DenominationInfo
+typedefstructtCRM9250N_DenominationInfo
+{
+WORD wDenomCode; //[out]DenominationID
+WORD wLength; //[out]Length
+WORD wWidth; //[out]Width
+WORD wThickness; //[out]Thickness
+}tCRM9250N_DenominationInfo;
+3.18 tGRGNoteGoDest
+typedefstructtGRGNoteGoDest
+{
+BYTE iType; //Destinationofnotes(1-cassette;2-NF;3-NE;4-URJB)
+char acDest[8]; //IfiType==1,itisthecassettID
+}tGRGNoteGoDest;
+3.19 tGRGNoteDetails
+typedefstructtGRGNoteDetails
+{
+UINT uiID; //Reserved
+SYSTEMTIME sSysTime; //Reserved
+char acJournalNo[32]; //Reserved
+char acAccountNo[48]; //Reserved
+BYTE byTimes; //Reserved
+WORD wNoteIndex; //Noteindex
+BYTE byValidation; //0-realnote;other-Notrealnote
+BYTE byFaceWay; //noteface
+WORD wDenomination; //DenominationID
+tGRGNoteGoDest sNoteGoDest; //Destinationofnotes
+char acImageFileName[64];//Noteserialnumberimagefilename
+
+===== PAGINA 13 =====
+char acSerialNo[32]; //Serialnumberofthenote
+char acMac[8]; //ImageMaccode
+BYTE byMatchCount; //Reserved
+}tGRGNoteDetails;
+3.20 tGRGSegSnData
+typedefstructtGRGSegSnData
+{
+DWORDadwData[32]; //Imagecrownwordnumberdotmatrixdata
+}tGRGSegSnData;
+3.21 tGRGSegOneSnInfo
+typedefstructtGRGSegOneSnInfo
+{
+WORD wNum; //Numberofcharacters,sameaswCharNum
+WORD wHeight; //Heightofeachimagecharacter,maximum32
+WORD wWidth; //Widthofeachimagecharacter,maximum32
+tGRGSegSnData asSnData[12]; //Dotmatrixdataofupto12characters.
+}tGRGSegOneSnInfo;
+3.22 tGRGNoteOCRInfo
+typedefstructtGRGNoteOCRInfo
+{
+WORD wNoteIndex; //Noteindex
+tGRGSegOneSnInfo asSnInfo; //Dotmatrixdata
+BYTE abyInfoErrCode[6];//Noteidentificationerrorcode
+BYTE abyRejectErrCode[6];//Rejectionerrorcode
+BYTE byQuality; //Reserved
+char acImageNameFront[260]; //Fullimagefilename_Front
+char acImageNameBack[260]; //Fullimagefilename_reverse
+BYTE abyReserved[32];
+}tGRGNoteOCRInfo;
+
+===== PAGINA 14 =====
+3.23 tCRM9250N_PDLProgress
+typedefstructtCRM9250N_PDLProgress
+{
+char acFileName[260]; //Thecurrentdownloadfilename
+int iTotalSize; //Filesize
+int iCurPos; //Thecurrentlydownloadedlocation
+BYTE abyReserved[32]; //Reserved
+}tCRM9250N_PDLProgress;
+3.24 tCRM9250N_DevVersionInfoEx
+typedefstructtCRM9250N_DevVersionInfoEx
+{
+char cSubType; //[out]Type,seeeCRM9250N_SubType
+char acFwMainBoard[32]; //[out]MainboardFirmwareversion
+char acFwUpperBoard[32]; //[out]UpperboardFirmwareversion
+char acFwAc[2][32]; //[out]AC1/AC2Firmwareversion
+char acFwLrb[8]; //[out]Reserved
+char acFwRc[16][32]; //[out]RC1-16Firmwareversion
+char acFwAtc[32]; //[out]ATCFirmwareversion
+char cHwNvInfo[32]; //[out]NVHardwareInformation
+char acFwDSP[32]; //[out]DSPFirmwareversion
+char acFwGraphicsFPGA[32];//[out]ImageFPGAversion
+char acFwArithmetic[32]; //[out]Algorithmversion
+char acFwMagneticArithmetic[32];//[out]Magneticalgorithmversion
+char acFwMagneticFPGA[32]; //[out]MagneticFPGAversion
+char acFwFullFormatThickness[32]; //[out]Thicknessversion
+char acFwUltravioletArithmetic[32]; //[out]UltravioletArithmeticversion
+char acFwDSPGraphicsArithmetic[32];//[out]DSPimagealgorithmversion
+char acFwFSNArithmetic[32];//[out]Crownfontsizealgorithmversion
+char acFwECBSoftware[32]; //[out]ECBsoftwareversion
+char acHwInfo[32];//[out]Hardwareversioninformation
+char acHwNv[32]; //[out]NVhardwareversion
+char acHwUnits[32];//[out]Devicehardwareversion
+char bySecFlag;//[out]Securitymark,0-unsupported,2-ecurity2.0
+char acFwDriverBoard[32]; //[out]Driverboardversion
+char byFsnCertification; //[out]Reserved
+char byCassetteLogicNums; //[out]Reserved
+char acReserved[253]; //Reserved
+}tCRM9250N_DevVersionInfoEx;
+
+===== PAGINA 15 =====
+3.25 tCRM9250N_DenominationTable
+typedefstruct tCRM9250N_DenominationTable
+{
+tCRM9250N_DenominationInfo asDenominationInfo[512]; //[out]Devicesupport
+currencyinformation
+BYTE abyReserved[32]; //Reserved
+}tCRM9250N_DenominationTable;
+3.26 tCRM9250N_LastInOutUnitsInfo
+typedefstructtCRM9250N_LastInOutUnitsInfo
+{
+int aiRcInOutNum[16];//[out]NumberofincomingandoutgoingnotesofRC(RC1~RC16)
+int iAcInOutNum; //[out]NumberofincomingandoutgoingnotesofAC
+int iLrbInOutNum; //[out]NumberofincomingandoutgoingnotesofLRB
+int iAtcInOutNum; //[out]NumberofincomingandoutgoingnotesofATC
+int iNeInOutNum; //[out]NumberofincomingandoutgoingnotesofNE
+int iNfOutNum; //[out]NumberofoutgoingnotesofNF
+int iNfInNum; //[out]NumberofincomingnotesofNF
+BYTE byPowerOff; //[out]Whetherthepowerisoffmarks0-No.0xFF-Poweroff
+BYTE abyReserved[31];//Reserved
+}tCRM9250N_LastInOutUnitsInfo;
+3.27 tCRM9250N_DenomDetails
+typedefstructtCRM9250N_DenomDetails
+{
+WORD wDenomCode; //Denominationcode.0:unavailabledenomination
+int iNoteCount; //countvalue
+BYTE byNoteType; //Notetype:2-Genuine(FIT)3-L24-L35-L4B
+}tCRM9250N_DenomDetails;
+3.28 tCRM9250N_ReqDispInfo
+typedefstructtCRM9250N_ReqDispInfo
+{
+WORD wDenomOrCassetteInfo; //RCnumber
+int iNum; //Thenumberofnotesrequired
+}tCRM9250N_ReqDispInfo;
+
+===== PAGINA 16 =====
+4 API
+4.1 hOpenLogicDevice
+ThisAPIreturnsadifferenthandlewhenpassedinadifferentlogicalname.Thesoftwareneedsto
+savethishandleandpassitinwhencallingotherAPIs.SothisisthefirstAPIyoushouldcall.
+HANDLEhOpenLogicDevice(constchar*p_pcLogicDevName);
+p_pcLogicDevName[in]:Passthedevicelogicalname.Itisthesameasthenode
+name[CRM9250NDev]ofGRGDTATM_CommCfg.ini
+CodeExample:
+HANDLE hret = hOpenLogicDevice("CRM9250NDev");
+4.2 vCloseLogicDevice
+Closethehandle.Thisisthefinalstep
+voidvCloseLogicDevice(HANDLEp_hDevHandle);
+p_hDevHandle[in]Devicehandle.
+4.3 iSetCommPara
+Basedonthelogicaldevicenamesetbytheuser,readtheparameterstobesetforcommunication
+fromGRGDTATM_CommCfg.ini,settheparametersforcommunicationofthedevice,and
+establishaconnectionforcommunicationwiththedevice
+intiSetCommPara(HANDLEp_hDevHandle,tDevReturn*p_psStatus);
+p_hDevHandle[in]Devicehandle.
+p_psStatus[out]Returnstatusstructure.
+4.4 iCloseComm
+Turnoffcommunication
+intiCloseComm(HANDLEp_hDevHandle,tDevReturn*p_psStatus)
+p_hDevHandle[in]Devicehandle.
+p_psStatus[out]Returnstatusstructure.
+
+===== PAGINA 17 =====
+4.5 iInitSettingEx
+Initialsettings.
+intiInitSettingEx(HANDLEp_hDevHandle,tCRM9250N_InitSettingEx*p_psInitSetting,
+tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psInitSetting[inout]Initializesthesetup
+p_psStatus[out]Returnstatusstructure.
+4.6 iInitEx
+Initializingthemachine.Afterthedevicefails,thisAPIneedstobecalledtotrytoreset,andthe
+notesinthechannelaresenttotheNF.However,ifpartofthenotehasenteredthecassette,it
+goesdirectlyintothecassette.
+intiInitEx(HANDLEp_hDevHandle,tCRM9250N_InitInfoEx*p_psInitInfo,tDevReturn
+*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psInitInfo[out]Initializationinformation
+p_psStatus[out]Returnstatusstructure.
+4.7 iGetCassetteInfoEx
+Getcassetteinformation.
+intiGetCassetteInfoEx(HANDLEp_hDevHandle,tCRM9250N_CassetteInfoEx
+*p_psCassetteInfo,tCRM9250N_CassetteStatusEx*p_psCassetteStatus,tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psCassetteInfo[inout]Cassetteinformation.
+p_psCassetteStatus[out]Cassettestatus
+p_psStatus[out]Returnstatusstructure.
+4.8 iSetCassetteInfoEx
+Setcassetteinformation.
+intiSetCassetteInfoEx(HANDLEp_hDevHandle,consttCRM9250N_CassetteInfoEx
+*p_psCassetteInfo,tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+
+===== PAGINA 18 =====
+p_psCassetteInfo[inout]Cassetteinformation.
+p_psStatus[out]Returnstatusstructure.
+4.9 iPowerOnInitEx
+Combiningcommands=iInitSettingEx+iGetCassetteInfoEx+iInitEx
+Itisrecommendedthateverytimethedeviceispoweredon/afterthedevicehasphysicaloperation
+(Thecassetteisinserted/pulledout,etc.).CallthecompositeAPI.
+intiPowerOnInitEx(HANDLEp_hDevHandle,tCRM9250N_InitSettingEx*p_psInitSetting,
+tCRM9250N_CassetteInfoEx*p_psCassetteInfo,tCRM9250N_CassetteStatusEx
+*p_psCassetteStatus,tCRM9250N_InitInfoEx*p_psInitInfo,tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psInitSetting[inout]Initializesthesetup
+p_psCassetteInfo[inout]Cassetteinformation.
+p_psCassetteStatus[out]Cassettestatus
+p_psInitInfo[out]Initializationinformation
+p_psStatus[out]Returnstatusstructure.
+4.10 iGetDevStatusEx
+Gettingmachinestatus,iftCRM9250N_DevStatusEx.ByCassettePlugRemovevalueis1,shows
+thecassettebeenpullouttheinsert,youneedtocall“iGetCassetteInfoEx”,afterreadingthe
+cassetteinformation,byCassettePlugRemovevaluebecomes0.
+intiGetDevStatusEx(HANDLEp_hDevHandle,tCRM9250N_DevStatusEx*p_psDevStatus,
+tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psDevStatus[out]Machinestatus
+p_psStatus[out]Returnstatusstructure.
+Note:
+Thedifferencebetween iGetDevStatusExand iGetLastDevStatusExisthattheformerqueries
+thestatusbycommunicatingwiththemachine,whilethelatterreadsthecurrentstatusinmemory
+(whichisautomaticallyupdatedinternallybythedllafteranyactionisperformed).
+4.11 iGetLastDevStatusEx
+Gettingmachinestatus,iftCRM9250N_DevStatusEx.ByCassettePlugRemovevalueis1,shows
+thecassettebeenpullouttheinsert,youneedtocall“iGetCassetteInfoEx”,afterreadingthe
+cassetteinformation,byCassettePlugRemovevaluebecomes0.
+
+===== PAGINA 19 =====
+intiGetLastDevStatusEx(HANDLEp_hDevHandle,tCRM9250N_DevStatusEx*p_psDevStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psDevStatus[out]Machinestatus
+4.12 iPrepareNextTransaction
+PrepareforthenextTransaction.
+intiPrepareNextTransaction(HANDLEp_hDevHandle,tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psStatus[out]Returnstatusstructure.
+4.13 iPrepareDeposit
+Reservedeposit.
+intiPrepareDeposit(HANDLEp_hDevHandle,tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psStatus[out]Returnstatusstructure.
+4.14 iOpenShutter
+Opentheshutter.
+intiOpenShutter(HANDLEp_hDevHandle,tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psStatus[out]Returnstatusstructure.
+4.15 iCloseShutter
+Closetheshutter.
+intiCloseShutter(HANDLEp_hDevHandle,tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psStatus[out]Returnstatusstructure.
+
+===== PAGINA 20 =====
+4.16 iGetLastTranDetail
+Afterthedevicesuddenpowerfailure,whendeviceispoweredonagain,itiscalledbefore
+“iInitEx”togetthenumberofnotesin/outofeachpartofthelasttransaction.
+intiGetLastTranDetail(HANDLEp_hDevHandle,tCRM9250N_LastInOutUnitsInfo
+*p_psTranData,BYTE*p_byOperator,tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psTranData[out]Numberofnotesin/outofeachpart.
+p_byOperator[out]Theoperationwhenthepowerisoff.
+0.Counting
+1.Deposit
+2.Cancelthedeposit
+3.Dispense
+4.AuditRCtoATC
+5.AuditATCtoRC
+6.RetractNFtoLRB
+7.RetractNFtoNE
+8.RetractNE
+9.RetractNF
+10.Initialization
+p_psStatus[out]Returnstatusstructure.
+4.17 iCashCount
+Counting.TheunqualifiednotesarereturnedtoNF-outletandthequalifiednotesentertheNE
+temporarystoragearea.
+intiCashCount(HANDLEp_hDevHandle,tCRM9250N_CashCount*p_psCashCount,
+tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psCashCount[inout]Countinformation
+p_psStatus[out]Returnstatusstructure.
+4.18 iStoreMoneyEx
+TodepositNotesintocassettes.
+intiStoreMoneyEx(HANDLEp_hDevHandle,tCRM9250N_StoreMoneyEx*p_psStoreMoney,
+tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+
+===== PAGINA 21 =====
+p_psStoreMoney[inout]Depositinformation
+p_psStatus[out]Returnstatusstructure.
+4.19 iCancelDepositEx
+CancelthedepositandthenotesinNEarereturnedtoNF-outlet.
+intiCancelDepositEx(HANDLEp_hDevHandle,tCRM9250N_CancelDepositEx
+*p_psCancelDeposit,tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psCancelDeposit[inout]Canceldepositinformation
+p_psStatus[out]Returnstatusstructure.
+4.20 iDispenseEx
+DispensenotesfromeachcassettetoNFasrequired.
+intiDispenseEx(HANDLEp_hDevHandle,tCRM9250N_DispenseInfoEx*p_psDispenseInfo,
+tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psDispenseInfo[inout]Dispenseinformation
+p_psStatus[out]Returnstatusstructure.
+4.21 iRetractEx
+RectractNF/NEnotestodesignatedcassetteasrequired.
+intiRetractEx(HANDLEp_hDevHandle,tCRM9250N_RetractInfoEx*p_psRetractInfo,
+tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psRetractInfo[inout]Informationontherecoveryofnotes.
+p_psStatus[out]Returnstatusstructure.
+4.22 iGetDenominationTable
+GetNVsupportedcurrency/denomination.
+intiGetDenominationTable(HANDLEp_hDevHandle,tCRM9250N_DenominationTable
+*p_psDenominationTable,tDevReturn*p_psStatus);
+
+===== PAGINA 22 =====
+p_hDevHandle[in]Logicaldevicehandle
+p_psDenominationTable[out]Notedenominationinformation
+p_psStatus[out]Returnstatusstructure.
+4.23 iGetNvConnected
+TestwhethertheNVisconnected.
+intiGetNvConnected(HANDLEp_hDevHandle,tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psStatus[out]Returnstatusstructure.
+4.24 iGetNvNotesInfoEx
+GettheinformationofnotesrecognizedbyNVmodule.
+intiGetNvNotesInfoEx(HANDLEp_hDevHandle,tGRGNoteDetails*p_psNoteDetails,
+tGRGNoteOCRInfo*p_psNoteOCRInfo,UINT*p_puiNumOfItems,BYTEp_byNoteType,
+charp_pcFsnFileName[260],tDevReturn*p_psStatus);
+p_hDevHandle[in]Logicaldevicehandle
+p_psNoteDetails[out]Noteinformation
+p_psNoteOCRInfo[out]Additionalnoteinformation
+p_puiNumOfItems
+[in]Lengthofthearrayp_psNoteDetails
+[out]Thenumofnoteinformation
+p_byNoteType[in]Thetypeofnotetoget.
+0x01-Realnotes
+0x02-Notrealnotes
+0x03-Allnotes
+0x04-Blacklistednotes
+0x08-36Counterfeitnotes(Type2notes)
+0x10-36Suspectedcounterfeitnotes(Class3notes)
+0x20-36appliestogenuinebanknotes(Class4Abanknotes)
+0x40-36doesnotapplytocirculationofgenuinenotes(Class4Bnotes)
+0x80-Suspiciousnotes
+Itsupportscombinationssuchas0x18forclass2(0x08)andclass3(0x10).
+p_pcFsnFileName[out]PathtothegeneratedFSNfile
+p_psStatus[out]Returnstatusstructure.
+
+===== PAGINA 23 =====
+4.25 iFirmwareDownload
+Downloadingfirmware.
+intiFirmwareDownload(HANDLEp_hDevHandle,constchar*p_pcDownloadPath,BYTE
+p_byMode,tDevReturn*p_psStatus);
+p_hDevHandle[in]Devicehandle.
+p_pcDownloadPath[in]Firmwarefilepath(directoryorindividualfile)
+p_byMode[in]Downloadmode1,CE;2,NV
+p_psStatus[out]Returnstatusstructure.
+4.26 iGetCurFileProgress
+Getthecurrentfirmwaredownloadprogress.
+intiGetCurFileProgress(HANDLEp_hDevHandle,tCRM9250N_PDLProgress
+*p_psPdlProgress);
+p_hDevHandle[in]Devicehandle.
+p_psPdlProgress[out]Firmwaredownloadstatus
+4.27 iGetDevVersionEx
+Getthefirmwareversionofeachmodule.
+intiGetDevVersionEx(HANDLEp_hDevHandle,tCRM9250N_DevVersionInfoEx
+*p_psDevVersion,tDevReturn*p_psStatus);
+p_hDevHandle[in]Devicehandle.
+p_psDevVersion[out]Firmwareversion
+p_psStatus[out]Returnstatusstructure.
+4.28 iGetCassetteDenomDetailsEx
+intiGetCassetteDenomDetailsEx(HANDLEp_hDevHandle,intp_iCassetteNo,int
+*p_piDenomCount,tCRM9250N_DenomDetails*p_psDenomDetails,tDevReturn*p_psStatus);
+p_hDevHandle[in]Devicehandle.
+p_iCassetteNo[in]0:AC1,1-10:RC1-RC10,11:LRB,12:AC2,13-18:RC11-RC16
+p_piDenomCount[in/out]
+p_psDenomDetails[Out]Informationofcurrencydenominationtable
+p_psStatus[out]Returnstatusstructure.
+
+===== PAGINA 24 =====
+5 Recommended Flow
+5.1 Power on
+
+
+===== PAGINA 25 =====
+5.2 Dispense
+
+
+===== PAGINA 26 =====
+5.3 Deposit

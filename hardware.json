@@ -1,0 +1,56 @@
+{
+  // Editar en la máquina real; no requiere recompilar. Los valores marcados VERIFICAR son supuestos.
+  "Recicladora": {
+    // Confirmados con la demo y el PDF del SDK de GRG (CRM9250NDev_V2.3.7.6).
+    "NombreDispositivoLogico": "CRM9250NDev", // nodo [CRM9250NDev] de GRGDTATM_CommCfg.ini
+    "CodigoExito": 0,                         // la demo compara ret == 0
+    "ModoAtc": 1,                             // byAtcMode: 1 = auditoría y RC
+    "ModoTrabajo": 0,                         // 0 = modo CRM
+    "AceptarTodasDenominaciones": 1,          // byDcAccepetAllDenom: acepta todas las de awAcceptableDenom
+    "ConfigInicio": 0,
+    "LimiteDeposito": 10,
+    "TipoDispensa": 1,                        // byDispType: 1 = dispensar por casete RC
+    "DestinoRechazoDispensa": 1,              // byRejectToAc: 1 = AC1, 2 = AC2, 3 = LRB
+    "DestinoRechazoDeposito": 1,              // byRejectPos: 1 = AC1, 2 = AC2, 3 = LRB
+    "MaxBilletesPrueba": 5,
+    // Mapa físico según TAC_Logical_Tecnica §2. "Indice" = número RC del SDK, base 1 (RC2 = 2 en la demo).
+    "Casetes": [
+      { "Indice": 1, "Nombre": "Cassette 1", "Moneda": "USD", "Denominacion": 20 },
+      { "Indice": 2, "Nombre": "Cassette 2", "Moneda": "MXN", "Denominacion": 500 },
+      { "Indice": 3, "Nombre": "Cassette 3", "Moneda": "MXN", "Denominacion": 200 },
+      { "Indice": 4, "Nombre": "Cassette 4", "Moneda": "MXN", "Denominacion": 100 }
+    ],
+    // Se llena con lo observado en Test_AceptarBilletes: código del SDK -> etiqueta. Ej. "12": "USD 20"
+    "EtiquetaDenominacion": {}
+  },
+  "Monederos": {
+    "BaudRate": 9600,
+    "MaxMonedasPrueba": 10,
+    "Hoppers": [
+      { "Nombre": "MK4 #1 ($1 MXN)", "Denominacion": 1, "Puerto": "COM3", "Direccion": 3 },
+      { "Nombre": "MK4 #2 ($5 MXN)", "Denominacion": 5, "Puerto": "COM3", "Direccion": 4 }
+    ]
+  },
+  "Escaner": {
+    "Simulado": true,                        // true hasta tener el SDK MEPR500+ del fabricante
+    "TimeoutSegundos": 30
+  },
+  "Impresora": {
+    "Modo": "Spooler",                       // "Spooler" (USB, cola de Windows RAW) o "Serial"
+    "NombreImpresora": "KP-80A",             // VERIFICAR nombre exacto: Get-Printer
+    "Puerto": "COM4",
+    "BaudRate": 115200
+  },
+  "Sensores": {
+    "Puerto": "COM5",
+    "BaudRate": 9600,
+    "SilencioTramaMs": 30,
+    // Tramas en hex (ej. "AA 01 02 55"). Obtenerlas con Test_CalibrarSensores. Vacío = sin configurar.
+    "Tramas": {
+      "PUERTA_ABIERTA": "",
+      "PUERTA_CERRADA": "",
+      "VIBRACION": "",
+      "PROXIMIDAD": ""
+    }
+  }
+}

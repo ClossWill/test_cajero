@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>IntegracionCajeroPruebas</RootNamespace>
+    <AssemblyName>FinsoHardwareTests</AssemblyName>
+    <!-- CRM9250NDev.dll del SDK de GRG es de 32 bits (PE machine 0x14C): el proceso debe ser x86. -->
+    <PlatformTarget>x86</PlatformTarget>
+    <!-- En máquinas con solo un runtime x86 más nuevo que .NET 8, permite ejecutar igual. -->
+    <RollForward>Major</RollForward>
+    <!-- Carpeta 'dll' del SDK de GRG (DLL + .ini + dependencias). Se copia completa junto al .exe. -->
+    <GrgSdkDir Condition="'$(GrgSdkDir)' == ''">$(MSBuildProjectDirectory)\referencias_integracion\CRM9250NDev_V2.3.7.6\dll\</GrgSdkDir>
+  </PropertyGroup>
+
+  <!-- referencias_integracion es material de consulta (demo WinForms, headers, PDFs): no se compila ni se copia. -->
+  <ItemGroup>
+    <Compile Remove="referencias_integracion\**" />
+    <EmbeddedResource Remove="referencias_integracion\**" />
+    <None Remove="referencias_integracion\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="hardware.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Config\CodigosLogicosGrg.tsv" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(GrgSdkDir)CRM9250NDev.dll')">
+    <None Include="$(GrgSdkDir)*.*" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="AvisoSdkGrg" BeforeTargets="Build" Condition="!Exists('$(GrgSdkDir)CRM9250NDev.dll')">
+    <Warning Text="No se encontró el SDK de GRG en '$(GrgSdkDir)'. Use -p:GrgSdkDir=&lt;carpeta dll&gt; o copie la carpeta a mano junto al .exe." />
+  </Target>
+
+</Project>

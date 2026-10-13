@@ -1,0 +1,211 @@
+
+
+===== PAGINA 1 =====
+FINSO.MX
+GUÍA DE INTEGRACIÓN Y ARQUITECTURA DEL "AGENTE ATM"
+Documento Técnico para el Equipo de Desarrollo (Diego) | Ref: HZ20260125
+Para: Diego (Lead Developer)
+De: Dirección General (Rubicon Ventures / Finso.mx)
+Nota de Ingeniería:  Diego, para el desarrollo del "Agente ATM" local en C# .NET, se analiza a continuación la
+factura proforma original de Hongzhou Technology HK Ltd. No existe un "SDK único de la máquina" porque un
+cajero industrial es un ecosistema híbrido compuesto por 23 partidas de hardware de distintas marcas integradas
+en un gabinete de acero. A continuación se define la naturaleza de cada componente y cómo se integra en el flujo
+lógico de software.
+1. Componentes Core que Requieren Programación Directa (Librerías / Protocolos)
+Estos componentes representan el núcleo transaccional del Agente ATM. Requieren mapeo de bytes, inyección de
+archivos fuente o consumo de SDKs provistos en las carpetas de integración:
+Part. Componente / Modelo Especificación de Hardware Dictamen Técnico para Desarrollo (Diego)
+5 Cash recycler with shutter
+GRG 9250N
+Recicladora de 4 casetes de
+aceptación (2,850 notas c/u) +
+Shutter.
+Inyección directa de código fuente: No busques
+una DLL cerrada. Utiliza el archivo abierto 
+CRM9250N.cs  incluido en la carpeta de GRG.
+Arrástralo a la solución .NET; este contiene los
+métodos y envoltorios nativos de comunicación
+con la recicladora.
+7 Coin dispenser
+MK4 * 2 PCS
+Dispensador doble de
+monedas. Capacidad
+multimoneda. 3 monedas/seg.
+Programación por protocolo serial: Se maneja
+mediante la norma técnica estándar de la industria
+ccTalk. Utiliza una librería genérica ccTalk de
+código abierto en C# e implementa los bytes de
+comandos específicos detallados en las tablas de
+Excel de la carpeta de integración.
+8 Passport scanner
+MEPR500+
+Sensor CMOS 3.1 MP, 400
+DPI. Lectura RFID e Infrarrojo
+(ICAO 9303).
+Consumo de SDK Propietario: Este periférico
+cuenta con su propio SDK de procesamiento
+OCR. Debes invocar sus funciones en segundo
+plano desde el Agente para recibir el string con los
+datos validados del usuario (Nombre, ID,
+Nacionalidad) para el motor de KYC.
+9 Receipt Printer
+KP-80A
+Impresora térmica de 80mm
+con autocortador. Velocidad
+250mm/s.
+Comandos Estándar: Conectada vía USB/Serial.
+No requiere SDK complejo; se programa mediante
+comandos genéricos de impresión industrial ESC/
+POS estándar para dar formato y emitir el ticket de
+confirmación al usuario.
+Finso.mx — Reporte Técnico de Ingeniería (Rubicon Ventures) Página 1 de 4
+
+===== PAGINA 2 =====
+2. Sensores, Seguridad y Periféricos con Comunicación Automatizada
+Componentes integrados que reportan eventos de estado de forma reactiva o que operan de manera autónoma sin
+necesidad de lógica transaccional compleja por parte del backend:
+Part. Componente / Modelo Especificación de Hardware Dictamen Técnico para Desarrollo (Diego)
+16 Multifunctional serial control
+module
+ALB02
+Módulo de control serial.
+Concentrador de sensores
+internos.
+Escucha Serial Reactiva: Esta placa concentra
+el switch de intrusión (apertura de puertas),
+sensor de vibración (anti-vandalismo) y
+proximidad. Envía cadenas de bytes automáticas
+a través de puerto COM. El Agente solo debe
+escuchar este puerto y detonar alertas al
+Middleware en AWS si el estado cambia.
+10 QR code scanner
+XZG004
+Escáner 1D/2D, CMOS
+1280x800 píxeles.
+Cero Programación (Plug & Play): Configurado
+de fábrica bajo el modo emulación de teclado
+(HID-KBW). Al pasar el código QR de la aplicación
+móvil frente al cristal, el dispositivo "teclea" la
+cadena alfanumérica directamente en el foco de la
+pantalla de la interfaz de usuario.
+11 Camera+NVR for face & cash
+acceptor
+Hikvision Ecosistema
+NVR DS-7604NI-Q1 +
+Cámaras pin-hole IP840 +
+Disco Duro 1TB.
+Ecosistema Autónomo Cerrado: Es un circuito
+de seguridad independiente que graba de forma
+automatizada en el disco local de 1TB. No
+requiere que el Agente gestione el
+almacenamiento. Únicamente si requieres
+visualización en vivo dentro de la app, se
+consumirá el API de red local de Hikvision.
+12 Camera (face recognition)
+GDZS-DC004-MG3021
+Cámara USB nativa. Píxeles:
+Luz visible 300W / Infrarrojo
+200W.
+Dispositivo de Video Estándar: Es detectada
+nativamente por el Kernel de Windows 11 IoT
+como una cámara web genérica USB. Se integra
+de manera directa utilizando librerías estándar de
+captura multimedia de .NET o wrappers de
+OpenCV.
+Finso.mx — Reporte Técnico de Ingeniería (Rubicon Ventures) Página 2 de 4
+
+===== PAGINA 3 =====
+3. Infraestructura, Periféricos Eléctricos y Sistema Operativo Nativo
+Componentes industriales que proporcionan la base de cómputo, conectividad de red y energía. Son gestionados
+en su totalidad por la capa de hardware y el sistema operativo de la máquina industrial:
+Part. Componente / Modelo Especificación de Hardware Dictamen Técnico de Gestión Operativa
+1 Industrial PC System
+Hardware Base
+Motherboard H310P-12C,
+Intel i5-8500, 8GB RAM,
+256GB SSD, Fuente 300W.
+Entorno de Ejecución Local: Es la computadora
+embebida central donde se instalará y ejecutará el
+binario compilado del Agente ATM de C#. Cuenta
+con puertos USB, COM (Serial) y LAN de grado
+industrial.
+2 Operation System
+Windows 11 IoT
+Windows 11 IoT Enterprise
+LTSC 2024.
+Capa de Drivers Nativos: El sistema operativo
+industrial de Microsoft provee el kernel estable y la
+asignación automática de puertos lógicos para los
+periféricos USB y emulaciones Serial-over-USB.
+3 y 4 Display & Touch screens
+Pantallas Duales
+Pantalla principal Touch
+Capacitiva de 19"
+(1280x1024) + Pantalla
+superior de 21.5".
+Salidas de Video Estándar: Conectadas vía
+HDMI/VGA. La interfaz táctil transmite
+coordenadas de manera transparente mediante
+protocolo USB HID integrado. El front-end
+interactúa como una aplicación de doble monitor
+estándar.
+13, 14
+y 17
+Conectividad y Climatización
+TP-Link / HC540 / NTK1
+Switch Ethernet, Router
+Industrial 3G/4G LTE y
+Controlador de temperatura +
+fans.
+Cero Programación: El termostato actúa de
+forma física interrumpiendo o activando el flujo
+eléctrico hacia los extractores. El router y switch
+proveen el túnel VPN directo de red hacia nuestro
+entorno seguro en la nube de AWS.
+6, 19,
+20 y 21
+Gabinete, Energía y Bóveda
+Mean Well / S&G Lock
+Chasis de acero CRS de
+2.5mm con puerta de bóveda
+de 8mm. Fuentes Mean Well
+(36V/24V/12V). Cerradura
+electrónica S&G.
+Infraestructura Física Industrial: Brinda la
+protección mecánica, el anclaje físico y la
+conversión de voltajes requerida por los
+actuadores mecánicos de la recicladora GRG y
+monederos MK4. La cerradura es de combinación
+digital autónoma de alta seguridad.
+4. Arquitectura de Orquestación General del "Agente ATM" (C# .NET)
+Diego, la arquitectura del software local que vas a desplegar no debe acoplarse directamente a los componentes
+de hardware. El diseño correcto para el Agente consiste en una estructura desacoplada basada en eventos:
+┌────────────────────────────────────────────────────────────────────────┐
+│ CAPA DE INTERFAZ DE USUARIO (Front-end HTML5/WPF) │
+└──────────────────────────────────┬─────────────────────────────────────┘
+│ (Eventos de Selección / Montos)
+▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ AGENTE CORE CENTRAL FINSO (Orquestador en .NET en PC Local) │
+│ ┌───────────────────────────┬────────────────────────────────────────┐ │
+│ │ Módulo de Billetes │ Invoca directamente: CRM9250N.cs │ │
+│ ├───────────────────────────┼────────────────────────────────────────┤ │
+│ │ Módulo de Monedas │ Wrapper Serial ccTalk (Librería Open) │ │
+Finso.mx — Reporte Técnico de Ingeniería (Rubicon Ventures) Página 3 de 4
+
+===== PAGINA 4 =====
+│ ├───────────────────────────┼────────────────────────────────────────┤ │
+│ │ Módulo de Seguridad │ Escucha puerto COM: ALB02 (Sensores) │ │
+│ ├───────────────────────────┼────────────────────────────────────────┤ │
+│ │ Módulo de Identificación │ Invoca: SDK MEPR500+ (Passport) │ │
+│ └───────────────────────────┴────────────────────────────────────────┘ │
+└──────────────────────────────────┬─────────────────────────────────────┘
+│ (Canal WebSockets Seguro / TLS)
+▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ MIDDLEWARE CENTRAL FINSO EN LA NUBE (AWS Core Engine - Producción) │
+│ (Validación AML Arantxa ── APIs de Liquidez ── Conexión Switch Adq) │
+└────────────────────────────────────────────────────────────────────────┘ 
+"El Agente local simplemente es un puente de software: traduce comandos de hardware físicos a variables
+estructuradas JSON dirigidas hacia el Middleware de AWS." 
+Finso.mx — Reporte Técnico de Ingeniería (Rubicon Ventures) Página 4 de 4

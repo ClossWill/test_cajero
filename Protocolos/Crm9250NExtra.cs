@@ -1,0 +1,56 @@
+using System.Runtime.InteropServices;
+using CRM9250N_WinFormDemo;
+
+namespace IntegracionCajeroPruebas.Protocolos;
+
+// Funciones documentadas en "CRM9250NDev API Description.pdf" que CRM9250N.cs (wrapper de GRG) no declara.
+// Se declaran aquí para no modificar el archivo del fabricante.
+internal static class Crm9250NExtra
+{
+    /// <summary>Consulta el estado de la máquina comunicándose con ella (PDF §4.10). Sin efectos físicos.</summary>
+    [DllImport("CRM9250NDev.dll", EntryPoint = "iGetDevStatusEx")]
+    public static extern int iGetDevStatusEx(IntPtr p_hDevHandle, IntPtr p_psDevStatus, IntPtr p_psStatus);
+
+    /// <summary>Cierra la comunicación (PDF §4.4).</summary>
+    [DllImport("CRM9250NDev.dll", EntryPoint = "iCloseComm")]
+    public static extern int iCloseComm(IntPtr p_hDevHandle, IntPtr p_psStatus);
+
+    /// <summary>Libera el handle; es el último paso (PDF §4.2).</summary>
+    [DllImport("CRM9250NDev.dll", EntryPoint = "vCloseLogicDevice")]
+    public static extern void vCloseLogicDevice(IntPtr p_hDevHandle);
+}
+
+/// <summary>tCRM9250N_DevStatusEx de CRM9250NDevStruct.h (PDF §3.9). Pack = 1 como el resto de structs del SDK.</summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+internal struct tCRM9250N_DevStatusEx
+{
+    public byte byShutterAreaHasNotes;
+    public byte byNfHasNotes;
+    public byte byNfNotesWrongPosition;
+    public byte byNeHasNotes;
+    public byte byShutterOpen;
+    public byte byNvOpen;
+    public byte byLowerChannelOpen;
+    public byte byUpperUnitDragOut;
+    public byte byUpperUnitInPos;
+    public byte byLowerUnitDragOut;
+    public byte byLowerUnitInPos;
+    public byte byCassettePlugRemove;
+    public tCRM9250N_CassetteStatusEx sCassetteStatus;
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 30)] public byte[] abyDevStatusInfo;
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 45)] public byte[] abySensorStatusInfo;
+    public byte byRC1PlugRemove;
+    public byte byRC2PlugRemove;
+    public byte byRC3PlugRemove;
+    public byte byRC4PlugRemove;
+    public byte byACPlugRemove;
+    public byte byATCPlugRemove;
+    public byte bySpeedStrategy;
+    public byte byRC9PlugRemove;
+    public byte byRC10PlugRemove;
+    public byte byRC11PlugRemove;
+    public byte byRC12PlugRemove;
+    public byte byAC2PlugRemove;
+    public byte byOutPosHasNotes;
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 19)] public byte[] abyReserved;
+}

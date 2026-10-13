@@ -1,0 +1,232 @@
+
+
+===== PAGINA 1 =====
+FINSO / Beex · Terminal Automática de Cambio de Divisas · Documento funcional-técnico 
+FINSO 
+Terminal Automática de Cambio de Divisas (TAC)  
+Documento de lógica funcional, reglas de negocio y lineamientos de construcción  
+ 
+Documento Alcance Versión 
+Diseño funcional/técnico Compra y venta física MXN ↔ USD 1.0 – Octubre 2026 
+ 
+Objetivo. Definir la lógica que debe implementar la TAC FINSO para cotizar, identificar al usuario cuando corresponda, recibir 
+y validar efectivo, administrar cassettes/recycler/monederos, ejecutar el cambio, dispensar efectivo, registrar el ledger y 
+resolver excepciones de forma segura y auditable. 
+ 
+
+===== PAGINA 2 =====
+FINSO / Beex · Terminal Automática de Cambio de Divisas · Documento funcional-técnico 
+1. Alcance y principios de diseño 
+La solución se concibe como una Terminal Automática de Cambio de Divisas y no como un ATM bancario. La operación 
+principal es el intercambio físico de MXN y USD, sin requerir por diseño una cuenta bancaria. La terminal debe actuar como un 
+dispositivo de captura y entrega de efectivo; las decisiones de precio, cumplimiento, límites, inventario y contabilización 
+deben residir en servicios centrales de FINSO. 
+Principio Aplicación 
+Backend autoritativo La TAC no decide tipo de cambio, límites regulatorios ni reglas PLD localmente. 
+Cotización antes del efectivo El cliente conoce monto final, tipo de cambio, ajuste/redondeo y moneda a recibir antes de insertar billetes. 
+Reserva previa de liquidez Antes de aceptar efectivo se reserva el inventario necesario para completar la entrega. 
+Atomicidad O se completa la operación y se confirma el ledger, o se ejecuta una ruta controlada de reversa/excepción. 
+Trazabilidad Cada transición, billete, cassette, recycler, regla y respuesta del hardware queda auditada. 
+Parametrización Límites, spread, comisión, vigencia de cotización, reglas KYC/PLD y redondeo se administran desde BackOffice. 
+ 
+2. Configuración física considerada 
+Componente Moneda/denominación Función 
+Cassette 1 USD 20 Dispensa USD. Única denominación USD habilitada para salida. 
+Cassette 2 MXN 500 Dispensa MXN. 
+Cassette 3 MXN 200 Dispensa MXN. 
+Cassette 4 MXN 100 Dispensa MXN. 
+Monedero 1 MXN 1 Entrega ajuste en pesos enteros. 
+Monedero 2 MXN 5 Entrega ajuste en pesos enteros. 
+Recycler USD y/o MXN no configurados para dispensa Recibe billetes válidos que no deben ir a un cassette dispensador. 
+ 
+Regla USD: todo billete USD 20 válido puede dirigirse al cassette USD 20 si el hardware admite reciclado hacia cassette y 
+existe capacidad; las demás denominaciones USD aceptadas (por ejemplo 1, 5, 10, 50 y 100) se destinan al recycler y no se 
+consideran disponibles para dispensación. Esta regla debe abstraerse detrás del Cash Manager para adaptarla al SDK real del 
+fabricante. 
+3. Flujo A – Compra de USD 
+Definición: el cliente entrega MXN y recibe USD. Como la única denominación USD dispensable es USD 20, el monto solicitado 
+debe ser múltiplo de USD 20. 
+Paso Lógica 
+1. Selección Cliente selecciona Comprar USD. 
+2. Monto USD La interfaz sólo permite múltiplos de USD 20 y aplica mínimos/máximos configurados. 
+3. Cotización Pricing Engine devuelve tipo vendedor, spread/comisión, vigencia y total MXN. 
+4. Ajuste de efectivo Si el cálculo contiene centavos, se aplica la política de redondeo configurada antes de confirmar. 
+5. Compliance Rules Engine determina nivel de identificación, acumulados, límites y controles PLD/FT. 
+6. Inventario Liquidity/Cash Manager verifica y reserva la cantidad exacta de billetes USD 20. 
+7. Recepción MXN Aceptador valida autenticidad, denominación, condición y total ingresado. 
+8. Confirmación Se confirma la recepción y se crea/actualiza la transacción en estado listo para dispensa. 
+
+===== PAGINA 3 =====
+FINSO / Beex · Terminal Automática de Cambio de Divisas · Documento funcional-técnico 
+9. Dispensa USD Se entregan exclusivamente billetes USD 20. 
+10. Cierre Se confirma entrega, ledger, inventario, comprobante y auditoría. 
+ 
+4. Flujo B – Venta de USD 
+Definición: el cliente entrega USD y recibe MXN. La terminal puede aceptar distintas denominaciones USD, aunque solamente 
+los USD 20 forman parte del inventario dispensable definido. 
+Paso Lógica 
+1. Selección Cliente selecciona Vender USD. 
+2. Monto Se informa el monto a vender o se permite que la terminal determine el total conforme se ingresan billetes, según UX definida. 
+3. Cotización Pricing Engine devuelve tipo comprador, spread/comisión, vigencia y MXN estimados. 
+4. Compliance Se ejecutan identificación, acumulados, límites y reglas PLD/FT. 
+5. Reserva MXN Se verifica una combinación dispensable con MXN 500/200/100 y monedas 5/1. 
+6. Recepción USD Cada billete se valida y clasifica por denominación. 
+7. Enrutamiento USD 20 → cassette/recurso dispensable; otras denominaciones USD → recycler. 
+8. Reconciliación El total validado debe coincidir con el monto aceptado por el cliente y la cotización vigente. 
+9. Dispensa MXN Cash Manager calcula y ordena la combinación de billetes/monedas. 
+10. Cierre Confirmación física + ledger + inventario + comprobante + auditoría. 
+ 
+5. Lógica de importes, centavos y tipo de cambio 
+La TAC no debe manejar centavos físicos. El cálculo financiero puede conservar precisión decimal internamente, pero el 
+importe final cobrado o pagado debe transformarse en un valor dispensable/recibible con el hardware disponible. 
+Caso Política recomendada 
+Cliente compra USD 
+Calcular MXN = USD × tipo vendedor + comisión. Si hay centavos, 
+ajustar al peso entero conforme política comercial; el cliente debe ver el 
+ajuste antes de confirmar. 
+Cliente vende USD Calcular MXN = USD × tipo comprador − comisión. Ajustar al importe entero que la terminal pueda dispensar. 
+USD a entregar Siempre múltiplo de USD 20. 
+MXN a entregar Debe existir combinación exacta con 500/200/100/5/1. Con monedas de $1 y $5 se puede representar cualquier peso entero, sujeto a stock. 
+Tipo mostrado Mostrar tipo de cambio base y, si corresponde, spread/comisión/ajuste por separado. Registrar también el tipo efectivo final. 
+Cotización vencida No aceptar efectivo con una cotización expirada; recotizar y requerir nueva aceptación. 
+ 
+Ejemplo de compra: USD 120 × 18,43 = MXN 2.211,60. Si la política definida es redondeo al alza para asegurar cobro completo, 
+la terminal presenta Total a ingresar: MXN 2.212 y Ajuste: MXN 0,40 antes de confirmar. El criterio exacto de redondeo debe ser 
+parametrizable y validado por negocio/compliance. 
+6. Motor de identificación, límites y PLD/FT 
+La terminal no debe hardcodear umbrales regulatorios. Debe consultar un Compliance Rules Engine central. Los límites 
+concretos deben configurarse y validarse por el responsable de cumplimiento según la figura regulatoria vigente de FINSO. 
+Entrada al motor Ejemplos 
+Operación Compra/Venta, moneda, monto, sucursal/terminal. 
+Usuario Identificador, cliente registrado/no registrado, expediente KYC, vigencia. 
+
+===== PAGINA 4 =====
+FINSO / Beex · Terminal Automática de Cambio de Divisas · Documento funcional-técnico 
+Acumulados Operaciones del día/período, montos y frecuencia. 
+Riesgo Perfil, alertas, listas, patrones de fraccionamiento. 
+Salida ALLOW, REQUIRE_DATA, REQUIRE_ID, REQUIRE_KYC, REQUIRE_REVIEW, BLOCK. 
+ 
+La UX debe adaptarse dinámicamente a la respuesta: datos básicos, lectura de INE/pasaporte, validación 
+documental/biométrica si aplica, QR de cliente FINSO o derivación a revisión. La clasificación interna por niveles puede 
+utilizarse como abstracción técnica, pero no debe confundirse con categorías regulatorias si éstas no coinciden. 
+7. Máquina de estados transaccional 
+Estado Descripción 
+CREATED Operación iniciada. 
+QUOTED Cotización emitida. 
+COMPLIANCE_APPROVED Reglas de identificación/PLD satisfechas. 
+CASH_RESERVED Inventario de salida reservado. 
+CASH_RECEIVING Terminal habilitada para recibir efectivo. 
+CASH_VALIDATED Efectivo aceptado y conciliado. 
+EXCHANGE_CONFIRMED Cambio financiero confirmado. 
+DISPENSING Orden física de entrega en curso. 
+COMPLETED Entrega confirmada y ledger cerrado. 
+CANCELLED Cancelada antes de recepción irreversible. 
+FAILED Error controlado. 
+PARTIAL_DISPENSE Entrega parcial detectada. 
+REFUND_REQUIRED Se requiere devolución/compensación. 
+MANUAL_REVIEW Intervención operativa requerida. 
+ 
+Cada transición debe ser idempotente y persistida. Nunca debe suponerse que una orden de dispensa equivale a una entrega 
+física exitosa: el SDK debe confirmar sensores/contadores y el backend debe reconciliar el resultado. 
+8. Arquitectura recomendada 
+Componente Responsabilidad 
+TAC UI Experiencia de usuario, captura de selección, identificación y confirmaciones. 
+Device Adapter Abstracción del SDK: aceptador, validador, cassettes, recycler, monederos, sensores. 
+Transaction Orchestrator Máquina de estados, idempotencia, timeouts y coordinación del flujo. 
+Pricing Engine Compra/venta, spread, comisión, vigencia y tipo efectivo. 
+Compliance Engine Identificación, KYC, PLD/FT, límites, acumulados y decisiones. 
+Cash Manager Inventario, reservas, rutas de billetes y algoritmo de dispensa. 
+Liquidity Manager Posición de efectivo por terminal/sucursal/moneda. 
+Ledger Asientos multimoneda y trazabilidad financiera. 
+Audit/Event Store Eventos técnicos y funcionales inmutables. 
+BackOffice Parámetros, monitoreo, conciliación, alertas y resolución de excepciones. 
+ 
+9. Algoritmo de dispensa MXN 
+El objetivo no es simplemente usar la mayor denominación posible: debe considerar stock, niveles mínimos operativos y 
+capacidad futura. Como primera versión puede utilizarse un algoritmo greedy 500→200→100→5→1, pero debe validarse contra 
+inventario y permitir una estrategia de preservación de denominaciones. 
+Regla Descripción 
+Exactitud La combinación debe sumar exactamente el monto entero a entregar. 
+Stock Nunca asignar más unidades que las disponibles/reservadas. 
+Reserva mínima Evitar vaciar una denominación si existe otra combinación razonable. 
+
+===== PAGINA 5 =====
+FINSO / Beex · Terminal Automática de Cambio de Divisas · Documento funcional-técnico 
+Fallback Si no existe combinación exacta, no aceptar el efectivo del cliente; ofrecer recotización/otro monto. 
+Confirmación física Descontar inventario definitivo sólo según el resultado confirmado por hardware. 
+ 
+10. Manejo de errores y reversas 
+Escenario Comportamiento esperado 
+Billete inválido Rechazarlo y no contabilizarlo. 
+Billete válido no dispensable Aceptar y dirigir a recycler si la política/hardware lo permite. 
+Cotización expira durante ingreso Definir ventana protegida: una vez iniciado CASH_RECEIVING, mantener la cotización durante un timeout configurado. 
+Falta de inventario antes de ingreso No habilitar recepción de efectivo. 
+Falla de comunicación Persistir estado local seguro, bloquear nueva operación y reconciliar con backend. 
+Dispensa parcial No marcar COMPLETED. Registrar denominaciones entregadas y pasar a PARTIAL_DISPENSE/MANUAL_REVIEW. 
+Corte de energía Recuperar transacción desde journal persistente y reconciliar contadores/sensores al reiniciar. 
+Recycler/cassette lleno Sacar componente de servicio o recalcular capacidad antes de permitir operaciones. 
+ 
+11. Datos mínimos a registrar 
+Por operación: Transaction ID, Terminal ID, sucursal, fecha/hora, compra/venta, moneda origen/destino, monto solicitado, 
+monto recibido, monto entregado, tipo de cambio base, spread, comisión, ajuste/redondeo, tipo efectivo, cotización y 
+expiración, identificación aplicada, resultado de compliance, acumulados relevantes, detalle de cada billete/moneda 
+ingresado y dispensado, destino cassette/recycler, respuestas del SDK, estados, errores, operador/revisión y comprobante. 
+12. APIs/contratos sugeridos 
+Servicio Operaciones sugeridas 
+Pricing createQuote, validateQuote 
+Compliance evaluateTransaction, validateCustomer 
+Cash getInventory, reserveCash, releaseReservation, planDispense 
+Transaction create, transition, confirmCashReceived, confirmDispense, fail 
+Ledger postExchange, reverseExchange 
+Device Adapter acceptCash, classifyNote, dispense, getCounters, getHealth 
+Receipt generateReceipt 
+Monitoring publishEvent, raiseAlert 
+ 
+Todos los comandos críticos deben llevar Transaction ID + Idempotency Key. Las APIs deben diferenciar comando aceptado de 
+resultado físico confirmado. 
+13. Estrategia de construcción 
+Fase Entregable 
+1. Dominio y simulador Modelo de transacción, estados, Pricing, Cash Manager y simulador de cassettes/recycler. 
+2. Flujos funcionales Compra USD y Venta USD end-to-end sin hardware. 
+3. Compliance Rules Engine parametrizable + identificación + acumulados. 
+4. Ledger y conciliación Asientos, inventario, cierre y reportes. 
+5. Excepciones Fallas, reversas, partial dispense, recuperación y alertas. 
+6. Adapter real Implementar interfaz contra SDK del fabricante sin cambiar lógica de negocio. 
+7. Certificación/UAT Casos nominales, bordes, seguridad, carga, corte de energía y 
+
+===== PAGINA 6 =====
+FINSO / Beex · Terminal Automática de Cambio de Divisas · Documento funcional-técnico 
+conciliación física. 
+ 
+14. Casos de prueba imprescindibles 
+• Compra USD 20/120/500 con MXN exactos. 
+• Compra con resultado decimal y aplicación del redondeo configurado. 
+• Intento de compra USD no múltiplo de 20. 
+• Venta USD usando combinaciones de 20, 50 y 100; sólo USD 20 queda dispensable. 
+• Venta con MXN pagable exactamente usando 500/200/100/5/1. 
+• Stock insuficiente de USD 20 o de una combinación MXN. 
+• Monedero $1 agotado y monto que requiere unidades. 
+• Billete inválido/rechazado y billete válido enviado a recycler. 
+• Cotización vencida antes y durante la recepción. 
+• Regla compliance REQUIRE_ID, REQUIRE_REVIEW y BLOCK. 
+• Falla de red antes/después de recibir efectivo. 
+• Dispensa parcial, atasco, cassette lleno y recycler lleno. 
+• Reinicio de terminal con transacción en curso. 
+• Reintento de API para comprobar idempotencia. 
+• Conciliación entre ledger, contadores físicos e inventario lógico. 
+15. Decisiones pendientes antes de integrar hardware 
+Decisión Definir con 
+Modelo exacto del equipo y capacidades de recycler Proveedor de hardware 
+Qué denominaciones acepta y cuáles puede reciclar/dispensar Proveedor de hardware 
+Política final de redondeo, spread y comisión Negocio/Tesorería 
+Umbrales y evidencias de identificación/PLD Compliance/Legal 
+Tratamiento de exceso de efectivo y devolución Producto + Hardware 
+Timeout de cotización una vez iniciado el ingreso Producto/Tesorería 
+Política de partial dispense y compensación Operaciones/Compliance 
+Comprobante fiscal/regulatorio y retención documental Legal/Contabilidad 
+ 
+16. Criterio de aceptación del módulo 
+El módulo se considera listo para integración física cuando los dos flujos nominales y todos los escenarios críticos pueden 
+ejecutarse contra el simulador, cada operación produce un ledger consistente, el inventario lógico coincide con los 
+movimientos simulados, las decisiones de compliance son parametrizables, las APIs son idempotentes y cualquier 
+interrupción puede recuperarse sin pérdida de trazabilidad ni doble contabilización. 
