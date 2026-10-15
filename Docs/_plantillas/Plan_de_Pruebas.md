@@ -10,7 +10,7 @@
 | 0 | Entorno y estructura | .NET 8, `System.IO.Ports` | – (menú) | este documento |
 | 1 | Recicladora GRG 9250N | `CRM9250NDev.dll` vía `CRM9250N.cs` | `Test_InicializarRecicladora`, `Test_AceptarBilletes`, `Test_DispensarBilletes` | [Prueba_Dia1_Recicladora.md](Prueba_Dia1_Recicladora.md) |
 | 2 | Monederos MK4 (x2) | ccTalk sobre COM | `Test_PingMonederos`, `Test_DispensarMonedas` | [Prueba_Dia2_Monederos.md](Prueba_Dia2_Monederos.md) |
-| 3 | Impresora KP-80A | ESC/POS (spooler USB o COM) | `Test_ImprimirVoucherPrueba` | [Prueba_Dia3_Impresora.md](Prueba_Dia3_Impresora.md) |
+| 3 | Impresora KP-80A | ESC/POS (spooler USB o COM) + SDK nativo (USB autoreply, canal de producción) | `Test_ImprimirVoucherPrueba` | [Prueba_Dia3_Impresora.md](Prueba_Dia3_Impresora.md) |
 | 4 | Módulo ALB02 (sensores) | Serial reactivo (COM) | `Test_CalibrarSensores`, `Test_EscucharSensores` | [Prueba_Dia4_Sensores.md](Prueba_Dia4_Sensores.md) |
 | 5 | Escáner MEPR500+ | SDK propietario | `Test_EscanearDocumento` | [Prueba_Dia5_Escaner.md](Prueba_Dia5_Escaner.md) |
 | 6 | Cierre y regresión | – | Todos, en secuencia | sección 5 |
@@ -35,7 +35,7 @@ hardware.json              puertos COM, direcciones y supuestos (se edita en la 
 CRM9250N.cs                fuente nativa del fabricante (sin modificar)
 Config/HardwareConfig.cs   carga de hardware.json
 Helpers/                   Consola (salida), Reporte (criterios), Native (marshaling)
-Protocolos/                CcTalk, EscPos + ImpresoraRaw, SerialTramas
+Protocolos/                CcTalk, EscPos + ImpresoraRaw, AutoReplyPrintSdk, SerialTramas
 Tests/                     una clase parcial HardwareTests por periférico
 Docs/                      estos documentos
 ```
@@ -46,9 +46,24 @@ Docs/                      estos documentos
 
 ### Helpers compartidos
 
-`Reporte` acumula los criterios de aceptación de cada prueba y emite `APROBADO`/`RECHAZADO` al final. Las confirmaciones físicas (¿cayeron las monedas?, ¿cortó el papel?) se piden por consola con `Consola.Confirmar`.
+`Reporte` acumula los criterios de aceptación de cada prueba y emite `APROBADO`/`RECHAZADO` al final.
+
+**Pruebas en remoto.** El desarrollador opera la consola a distancia y un asistente en sitio manipula la máquina. `Guia_Asistente_Sitio.md` es la guía no técnica para el asistente, con una sección por prueba que lo necesita (recicladora, monederos, impresora). Todo lo que se le dice al asistente sale en magenta con el prefijo `>> ASISTENTE:` para leérselo tal cual; el desarrollador teclea lo que responde. `Consola` ofrece:
+
+| Método | Uso |
+| :-- | :-- |
+| `AntesDeMover` | Antes de cada movimiento mecánico (`!! VA A MOVERSE`). Si el asistente no está listo, la prueba se detiene sin mover nada y queda en `RECHAZADO` |
+| `Asistente` | Instrucción física; bloquea hasta que el asistente dice "listo". Se usa siempre antes de cerrar o abrir el shutter con billetes dentro |
+| `PreguntarNumeroAsistente` | Conteos (billetes en el shutter, monedas en la bandeja). Se pide el número y no un sí/no sobre el esperado, para no inducir la respuesta |
+| `PreguntarAsistente` / `PreguntarTextoAsistente` | Observaciones de sí/no y datos libres (qué billete va a insertar) |
+
+`Bitacora` copia la consola completa (salida y lo tecleado) a `bitacoras\sesion_AAAAMMDD_HHMMSS.txt`, junto al `.exe`. Cada prueba imprime su hora de inicio para cruzarla con los logs del SDK de GRG.
 
 {{CODE:Helpers/Reporte.cs}}
+
+{{CODE:Helpers/Consola.cs}}
+
+{{CODE:Helpers/Bitacora.cs}}
 
 {{CODE:Helpers/Native.cs}}
 
@@ -82,15 +97,17 @@ Docs/                      estos documentos
 | :-- | :-- | :-- | :-- |
 | 1 | ~~Nombre lógico y código de éxito~~ **Confirmado:** `CRM9250NDev`, `rc == 0` (demo y PDF de GRG) | `Recicladora.*` | – |
 | 2 | ~~`byDispType` e `Indice` de casete~~ **Confirmado:** `1` = por casete; RC1..RC4 = 1..4 | `TipoDispensa`, `Casetes[].Indice` | Probar con 1 billete por casete |
-| 3 | Dispense de hopper = `[serie x3][cantidad]` sin cifrado | `Monederos.cs` | Manual MK4; si responde NAK, implementar Pump RNG (161) / cipher (160) |
+| 3 | ~~Dispense de hopper~~ **Confirmado (doc. MK4):** 8 bytes en 0 + cantidad, sin cifrado; responde con contador de eventos | `Monederos.cs` | Probar con 1 moneda |
 | 4 | Direcciones ccTalk de los hoppers (3 y 4) | `Monederos.Hoppers` | Si no responden, hacer barrido de direcciones 1–10 |
 | 5 | Formato de tramas del ALB02 | `Sensores.Tramas` | `Test_CalibrarSensores` |
 | 6 | API del SDK del MEPR500+ | `EscanerMeprSdk` | Documentación y DLL del fabricante |
 | 7 | ~~Bits de la DLL~~ **Confirmado:** x86. Falta `DevBaseDll.dll` en el zip del SDK | `.csproj` | El pre-vuelo del menú 1 lo detecta |
+| 8 | ~~Nombre de la cola de la impresora~~ **Confirmado:** `POS80 Printer` (driver POS80), no "KP-80A" | `Impresora.NombreImpresora` | `Get-Printer` |
+| 9 | Modo `UsbSdk` de la impresora (canal recomendado para producción) sin probar en hardware real | `AutoReplyPrintSdk.cs` | `Test_ImprimirVoucherPrueba` con `Modo: "UsbSdk"` |
 
 ## 4. Convenciones de evidencia
 
-Para cada prueba guardar en `Evidencia/DiaN/`: captura de la consola con el resultado `APROBADO`/`RECHAZADO`, foto o video corto del comportamiento físico y, en la impresora, el voucher físico. Las tramas crudas (ccTalk, ALB02) se pegan tal como aparecen en consola.
+Para cada prueba guardar en `Evidencia/DiaN/`: la bitácora de la sesión (`bitacoras\sesion_*.txt`) con el resultado `APROBADO`/`RECHAZADO`, foto o video corto del comportamiento físico y, en la impresora, el voucher físico. Las tramas crudas (ccTalk, ALB02) se pegan tal como aparecen en consola.
 
 ## 5. Día 6 – Cierre y regresión
 

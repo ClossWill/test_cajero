@@ -13,6 +13,8 @@
     <RollForward>Major</RollForward>
     <!-- Carpeta 'dll' del SDK de GRG (DLL + .ini + dependencias). Se copia completa junto al .exe. -->
     <GrgSdkDir Condition="'$(GrgSdkDir)' == ''">$(MSBuildProjectDirectory)\referencias_integracion\CRM9250NDev_V2.3.7.6\dll\</GrgSdkDir>
+    <!-- autoreplyprint.dll nativa (win32) del SDK de la impresora KP-80A, usada solo en modo Impresora.Modo=UsbSdk. -->
+    <PrinterSdkDir Condition="'$(PrinterSdkDir)' == ''">$(MSBuildProjectDirectory)\referencias_integracion\Receipt Printer(KP-80A)\autoreplyprint_dll_win32\</PrinterSdkDir>
   </PropertyGroup>
 
   <!-- referencias_integracion es material de consulta (demo WinForms, headers, PDFs): no se compila ni se copia. -->
@@ -36,6 +38,13 @@
   </ItemGroup>
   <Target Name="AvisoSdkGrg" BeforeTargets="Build" Condition="!Exists('$(GrgSdkDir)CRM9250NDev.dll')">
     <Warning Text="No se encontró el SDK de GRG en '$(GrgSdkDir)'. Use -p:GrgSdkDir=&lt;carpeta dll&gt; o copie la carpeta a mano junto al .exe." />
+  </Target>
+
+  <ItemGroup Condition="Exists('$(PrinterSdkDir)autoreplyprint.dll')">
+    <None Include="$(PrinterSdkDir)autoreplyprint.dll" Link="autoreplyprint.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="AvisoSdkImpresora" BeforeTargets="Build" Condition="!Exists('$(PrinterSdkDir)autoreplyprint.dll')">
+    <Warning Text="No se encontró autoreplyprint.dll en '$(PrinterSdkDir)' (solo necesaria para Impresora.Modo=UsbSdk). Use -p:PrinterSdkDir=&lt;carpeta&gt; o copie la DLL a mano junto al .exe." />
   </Target>
 
 </Project>

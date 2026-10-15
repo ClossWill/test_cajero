@@ -83,7 +83,7 @@ public static partial class HardwareTests
                 escaner.Inicializar();
                 r.Criterio("SDK inicializado y dispositivo detectado", true);
 
-                Consola.Aviso("Coloque el pasaporte / INE sobre la ventana del escáner...");
+                Consola.Asistente("Coloque el pasaporte o la INE sobre la ventana del escáner y no lo mueva.");
                 var presente = escaner.EsperarDocumento(TimeSpan.FromSeconds(cfg.TimeoutSegundos));
                 if (!r.Criterio($"Documento detectado en {cfg.TimeoutSegundos} s", presente)) { r.Finalizar(); return; }
 
@@ -96,7 +96,7 @@ public static partial class HardwareTests
                 r.Criterio("Nombre, ID y Nacionalidad extraídos (no vacíos)",
                     new[] { doc.Nombre, doc.NumeroDocumento, doc.Nacionalidad }.All(c => !string.IsNullOrWhiteSpace(c)));
                 r.Criterio("Los datos impresos coinciden con el documento físico",
-                    !cfg.Simulado && Consola.Confirmar("¿Los datos mostrados coinciden con el documento?"),
+                    !cfg.Simulado && Consola.PreguntarAsistente("Le leo nombre, ID y nacionalidad: ¿coinciden con el documento?"),
                     cfg.Simulado ? "Modo SIMULADO: esta prueba no puede aprobarse sin el hardware real." : null);
             }
         }

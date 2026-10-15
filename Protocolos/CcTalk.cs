@@ -16,13 +16,16 @@ public sealed class CcTalkBus : IDisposable
     public const byte Host = 1;
 
     // Headers del estándar ccTalk (Generic Specification) usados en las pruebas.
+    public const byte HResetDevice = 1;
     public const byte HSimplePoll = 254;
     public const byte HRequestEquipmentCategory = 245;
     public const byte HRequestProductCode = 244;
     public const byte HRequestSerialNumber = 242;
     public const byte HRequestSoftwareRevision = 241;
+    public const byte HTestHopper = 163;
     public const byte HEnableHopper = 164;
     public const byte HRequestHopperStatus = 166;
+    public const byte HRequestHighLowStatus = 217;
     public const byte HDispenseHopperCoins = 167;
 
     private readonly SerialPort _puerto;

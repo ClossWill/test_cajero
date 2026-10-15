@@ -11,6 +11,10 @@ internal static class Crm9250NExtra
     [DllImport("CRM9250NDev.dll", EntryPoint = "iGetDevStatusEx")]
     public static extern int iGetDevStatusEx(IntPtr p_hDevHandle, IntPtr p_psDevStatus, IntPtr p_psStatus);
 
+    /// <summary>Lee la información y el estado de los casetes (PDF §4.7). Solo consulta; no es la inicialización mecánica.</summary>
+    [DllImport("CRM9250NDev.dll", EntryPoint = "iGetCassetteInfoEx")]
+    public static extern int iGetCassetteInfoEx(IntPtr p_hDevHandle, IntPtr p_psCassetteInfo, IntPtr p_psCassetteStatus, IntPtr p_psStatus);
+
     /// <summary>Cierra la comunicación (PDF §4.4).</summary>
     [DllImport("CRM9250NDev.dll", EntryPoint = "iCloseComm")]
     public static extern int iCloseComm(IntPtr p_hDevHandle, IntPtr p_psStatus);

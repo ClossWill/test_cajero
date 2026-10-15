@@ -159,13 +159,16 @@ public static partial class HardwareTests
             ("VIBRACION", "Golpee suavemente el gabinete."),
         };
 
+        // Ventana amplia: entre el ENTER del desarrollador y la acción del asistente hay latencia de llamada.
+        const int ventanaSegundos = 12;
         foreach (var (evento, instruccion) in pasos)
         {
-            Consola.Esperar($"[{evento}] {instruccion} Presione ENTER y realice la acción durante 6 s...");
+            Consola.Asistente($"[{evento}] Prepárese: {instruccion} Hágalo cuando le diga \"AHORA\".");
+            Consola.Esperar($"     ENTER y diga \"AHORA\" al asistente: se capturan {ventanaSegundos} s...");
             puerto.DiscardInBuffer();
 
             var distintas = new Dictionary<string, int>();
-            var fin = DateTime.UtcNow.AddSeconds(6);
+            var fin = DateTime.UtcNow.AddSeconds(ventanaSegundos);
             SerialTramas.Escuchar(puerto, Sensores.SilencioTramaMs, () => DateTime.UtcNow < fin, trama =>
             {
                 var hex = Consola.Hex(trama);

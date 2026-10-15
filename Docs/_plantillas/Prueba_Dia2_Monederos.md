@@ -7,7 +7,8 @@ Confirmar que el PC se comunica por puerto serial con los dos hoppers MK4 (ping 
 ## Protocolo / librería
 
 - **ccTalk** sobre puerto COM (8N1, normalmente 9600 baudios). Implementación mínima propia en `Protocolos/CcTalk.cs` (sin dependencias): trama `[destino][nº datos][origen=1][header][datos…][checksum]`, con suma total ≡ 0 mod 256. El código descarta el eco de la propia trama, habitual en la línea ccTalk de un solo hilo.
-- Headers usados: `254` Simple poll, `245` categoría de equipo, `244` código de producto, `241` revisión de software, `242` número de serie, `164` Enable hopper, `167` Dispense hopper coins, `166` Request hopper status.
+- Headers usados: `254` Simple poll, `245` categoría de equipo, `244` código de producto, `241` revisión de software, `242` número de serie, `163` Test hopper, `164` Enable hopper, `167` Dispense hopper coins, `166` Request hopper status, `217` Request high/low status (nivel de monedas).
+- Fuente de los comandos: `referencias_integracion/CoinDispenserMK4` (Shanghai Elan: "MK2 & MK4 Coin Dispensor Commands", "Programming Flow", "cctalk address"). Cubre poll, reset, enable, dispense, estado, test hopper y nivel de monedas.
 - Puerto: `System.IO.Ports` (paquete NuGet `System.IO.Ports` 8.0.0).
 
 ## Precondiciones
@@ -41,6 +42,16 @@ Si cada hopper está en un COM distinto, basta cambiar `Puerto`. El código abre
 
 {{CODE:Tests/Monederos.cs}}
 
+## Modalidad remota (desarrollador a distancia + asistente en sitio)
+
+`Test_PingMonederos` no requiere al asistente: es puramente eléctrico/serial. `Test_DispensarMonedas` sí lo necesita, una vez por hopper, solo para contar lo que cayó:
+
+| Momento | Qué pasa en consola | Qué hace el asistente |
+| :-- | :-- | :-- |
+| Al terminar de dispensar cada hopper | "¿Cuántas monedas de \$N cayeron en la bandeja?" | Las cuenta sin tocarlas y dice el número (ver `Guia_Asistente_Sitio.md`, sección Monederos) |
+
+No hay `AntesDeMover`: el mecanismo del hopper es un tambor cerrado, no hay un shutter donde el asistente pueda tener la mano dentro.
+
 ## Cómo ejecutar
 
 Menú `4` (ping) y `5` (dispensar; pide cantidades). Equivalente desde `Main`:
@@ -69,10 +80,10 @@ HardwareTests.Test_DispensarMonedas(2, 1); // dos monedas de $1, una de $5
 ## Supuestos y riesgos
 
 - **Confirmado por el TAC §2:** Monedero 1 entrega MXN 1 y Monedero 2 entrega MXN 5; la configuración de `Hoppers` coincide.
-- **Falta la fuente de los comandos:** el BEEX indica que los bytes específicos están en "las tablas de Excel de la carpeta de integración", que no se han recibido. Esas tablas deben contrastarse con `CcTalk.cs` antes de dar por buenos los puntos siguientes. Además el BEEX recomienda usar una librería ccTalk de código abierto; este código usa una implementación mínima propia.
-- **Formato del comando Dispense (167):** se asume `[serie x3][cantidad]` sin cifrado. Si el MK4 responde NAK, requiere modo seguro (Pump RNG `161`, Request cipher key `160`); sería un trabajo adicional del día 2.
-- Direcciones 3 y 4 son una suposición; si nadie responde, barrer las direcciones 1–10 con Simple Poll.
+- **Dispense (167), confirmado por el fabricante:** 9 bytes de datos = 8 en `00` + cantidad (1–255), sin cifrado (modo por defecto). El MK4 responde con 1 byte de datos (contador de eventos), por eso no se exige ACK vacío. Sondear `166` cada 200 ms con reintentos (~10 seguidos antes de declarar falla). El BEEX recomienda usar una librería ccTalk de código abierto; este código usa una implementación mínima propia, ya validada contra el manual del fabricante.
+- Las direcciones ccTalk se fijan por pines del hopper (tabla en "MK2 cctalk address.pdf": 3 = por defecto, 4, 5...). Cada hopper debe tener una distinta; si nadie responde, barrer 1–10 con Simple Poll.
 - Conviene que el primer intento use cantidades pequeñas (1 moneda) y vigilar atascos.
+- **Sin probar aún en la máquina real** (2026-10-14): el código compila; falta ejecutar `Test_PingMonederos` y `Test_DispensarMonedas` frente al hardware.
 
 ## Evidencia a guardar
 

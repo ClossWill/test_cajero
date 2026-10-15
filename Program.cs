@@ -9,14 +9,17 @@ using IntegracionCajeroPruebas.Tests;
 Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
+Bitacora.Iniciar(); // después de fijar la codificación: envuelve Console.Out/In ya configurados
 
 Console.WriteLine("Iniciando Pruebas de Hardware FINSO...");
+Console.WriteLine($"Bitácora de la sesión: {Bitacora.Ruta ?? "(desactivada)"}");
 Console.WriteLine($"Proceso de {(Environment.Is64BitProcess ? 64 : 32)} bits | config: {HardwareConfig.RutaArchivo}"
                   + (File.Exists(HardwareConfig.RutaArchivo) ? "" : " (no existe: se usan valores por defecto)"));
 
 var menu = new (string Clave, string Texto, Action Accion)[]
 {
-    ("1", "Recicladora  - Inicializar",              HardwareTests.Test_InicializarRecicladora),
+    ("1", "Recicladora  - Inicializar (conecta, sin movimiento)", () => HardwareTests.Test_InicializarRecicladora()),
+    ("11", "Recicladora - Reinicio mecánico (iPowerOnInitEx, SE MUEVE)", () => HardwareTests.Test_InicializarRecicladora(reinicioMecanico: true)),
     ("2", "Recicladora  - Aceptar billetes",         () => HardwareTests.Test_AceptarBilletes()),
     ("3", "Recicladora  - Dispensar billetes",       () => HardwareTests.Test_DispensarBilletes(
                                                          PedirEntero("Cantidad de billetes", 1), PedirTexto("Moneda (MXN/USD)", "MXN"),

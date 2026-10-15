@@ -12,7 +12,8 @@ Demostrar que desde C# podemos abrir el dispositivo, inicializarlo, **aceptar un
 
 | Prueba | Llamadas SDK, en orden |
 | :-- | :-- |
-| Inicializar | pre-vuelo de la DLL → `hOpenLogicDevice("CRM9250NDev")` → `iSetCommPara` → `iPowerOnInitEx` → `iGetDevVersionEx` → `iGetDevStatusEx` |
+| Inicializar (menú 1, **no mueve nada**) | pre-vuelo de la DLL → `hOpenLogicDevice("CRM9250NDev")` → `iSetCommPara` → `iGetCassetteInfoEx` (informativa) → `iGetDevVersionEx` → `iGetDevStatusEx` |
+| Reinicio mecánico (menú 11, **se mueve**) | lo anterior + `iPowerOnInitEx` (= `iInitSettingEx` + `iGetCassetteInfoEx` + `iInitEx`), previa confirmación del asistente. Lo piden solas las opciones 2 y 3, una vez por sesión |
 | Aceptar | `iPrepareDeposit` → `iOpenShutter` → *(usuario inserta)* → `iCloseShutter` → `iCashCount` → `iStoreMoneyEx` **o** `iCancelDepositEx` → `iPrepareNextTransaction` |
 | Dispensar | `iPrepareDispense` → `iDispenseEx` → *(usuario retira)* → `iPrepareNextTransaction` |
 
@@ -63,9 +64,24 @@ Valores tomados de la **demo WinForms y el PDF del SDK de GRG**: el nombre lógi
 
 `EtiquetaDenominacion` empieza vacío: el SDK devuelve un **código** de denominación (`wCode`), no "USD 20". Al aceptar un billete conocido, la prueba pregunta qué billete es y te indica qué par `código → etiqueta` agregar. Así se construye la tabla real del equipo durante la primera sesión.
 
+## Modalidad remota (desarrollador a distancia + asistente en sitio)
+
+El desarrollador opera la consola a distancia y un asistente en sitio mete y saca los billetes. Antes de empezar, el asistente lee la sección 1 ("Recicladora de billetes") de `Guia_Asistente_Sitio.md` y los dos quedan en llamada o videollamada durante toda la prueba.
+
+| Momento | Qué pasa en consola | Qué hace el asistente |
+| :-- | :-- | :-- |
+| Antes de abrir el shutter o dispensar | `!! VA A MOVERSE` + "¿El asistente está listo?" | Aleja las manos y dice "listo". Si responde que no, la prueba se detiene sin mover nada |
+| Aceptar: antes de insertar | Pregunta qué billete tiene a la mano | Dice cuál es (queda en la bitácora junto al código del SDK) |
+| Aceptar: shutter abierto | "¿Ve el shutter abierto?" | Lo confirma (R-06 físico) |
+| Aceptar: al insertar | Bloquea hasta "listo"; **al dar ENTER el shutter se cierra** | Inserta, retira la mano por completo y solo entonces dice "listo" |
+| Devolución | Aviso antes de abrir; luego "¿Cuántos billetes retiró?" | Retira y dice el número |
+| Dispensa | "¿Cuántos billetes hay en el shutter?" (también si `iDispenseEx` falló) | Los cuenta **sin tocarlos**, dice el número y la denominación, luego los retira |
+
+Los conteos se piden como número y no como sí/no para no inducir la respuesta. Toda la sesión queda en `bitacoras\sesion_*.txt` junto al `.exe`: es la evidencia que se comparte.
+
 ## Fase 0 – Validar la comunicación (primer objetivo)
 
-Antes de aceptar o dispensar nada, el menú `1` debe quedar en `APROBADO`. Esa opción hace un pre-vuelo y después el arranque real del SDK, y se detiene en el primer fallo diciendo qué pasó:
+Antes de aceptar o dispensar nada, el menú `1` debe quedar en `APROBADO`. Esa opción hace un pre-vuelo y después abre y consulta el SDK **sin mover la máquina** (`iPowerOnInitEx` hace un reinicio mecánico y va aparte, en el menú `11`), y se detiene en el primer fallo diciendo qué pasó:
 
 | Paso | Qué comprueba | Si falla, causa probable |
 | :-- | :-- | :-- |
@@ -76,7 +92,7 @@ Antes de aceptar o dispensar nada, el menú `1` debe quedar en `APROBADO`. Esa o
 | 5 | Todas las DLL que importa `CRM9250NDev.dll` existen (lee la tabla de importación) | Falta p. ej. `DevBaseDll.dll`: no viene en el zip del SDK |
 | 6 | Windows carga la DLL (126 = dependencia, 193 = arquitectura) | Ver la línea del paso 5 |
 | 7 | `hOpenLogicDevice` devuelve handle ≠ 0 | Nombre lógico incorrecto o SDK sin su `.ini` |
-| 8 | `iSetCommPara` e `iPowerOnInitEx` devuelven 0 | Ver `logic`/`phy`/`msg` impresos; consultar `CRM9250N LogicalCode.xls` del SDK |
+| 8 | `iSetCommPara` devuelve 0 (e `iPowerOnInitEx` si se ejecuta el menú 11) | Ver `logic`/`phy`/`msg` impresos; consultar `CRM9250N LogicalCode.xls` del SDK |
 | 9 | `iGetDevVersionEx` devuelve firmware legible y se listan los casetes presentes | Comparar con lo instalado físicamente |
 | 10 | `iGetDevStatusEx` responde (consulta en vivo, sin mover nada) | Confirma el enlace de ida y vuelta con la máquina |
 
@@ -121,14 +137,14 @@ Para cada billete se repite el flujo de `Test_AceptarBilletes` y se anota el có
 | :-- | :-- | :-- |
 | R-01 | `CRM9250NDev.dll` carga sin `DllNotFound` ni `BadImageFormat` | Prueba 1 no muestra el error de carga |
 | R-02 | `hOpenLogicDevice` devuelve un handle distinto de cero | Criterio automático |
-| R-03 | `iSetCommPara` e `iPowerOnInitEx` devuelven el código de éxito | Criterio automático (rc y `tDevReturn` impresos) |
+| R-03 | `iSetCommPara` (menú 1) e `iPowerOnInitEx` (menú 11, o la primera vez que se usa 2 o 3) devuelven el código de éxito | Criterio automático (rc y `tDevReturn` impresos) |
 | R-04 | El estado de casetes lista exactamente los casetes instalados físicamente | Comparar la salida con la máquina |
 | R-05 | `iGetDevVersionEx` devuelve una versión de firmware legible | Salida de consola |
 | R-06 | El shutter abre y cierra físicamente y `iCashCount` cuenta ≥ 1 billete | Observación + criterio automático |
 | R-07 | La denominación reportada corresponde al billete insertado | Comparación manual del código de denominación |
 | R-08 | `iStoreMoneyEx` guarda el billete **o** `iCancelDepositEx` lo devuelve por el shutter | Rc de éxito + observación física |
 | R-09 | `iDispenseEx` reporta exactamente `cantidad` billetes dispensados y 0 rechazados | Criterio automático |
-| R-10 | La cantidad física en el shutter coincide con lo reportado | Confirmación por consola |
+| R-10 | La cantidad física en el shutter coincide con lo reportado | El asistente cuenta los billetes; la consola compara su número con el reportado |
 | R-11 | Tres ciclos consecutivos (aceptar + dispensar) sin reiniciar el programa ni la máquina | Repetición manual |
 | R-12 | Cada billete MXN 500/200/100 y USD 20 se identifica con un código de denominación distinto y estable (mismo billete → mismo código) | Tabla `EtiquetaDenominacion` completada |
 | R-13 | Un billete inválido se rechaza (`rechazados ≥ 1`, 0 contados) y el programa no se bloquea | Opción `10` |
@@ -148,4 +164,4 @@ Para cada billete se repite el flujo de `Test_AceptarBilletes` y se anota el có
 
 ## Evidencia a guardar
 
-Captura de consola de las tres pruebas, foto de los casetes y del shutter con los billetes dispensados, y los valores `tDevReturn` de cualquier falla.
+La bitácora `bitacoras\sesion_*.txt` de cada corrida (salida completa, respuestas del asistente y valores `tDevReturn` de cualquier falla). El asistente toma una foto de los casetes y del shutter con los billetes dispensados antes de retirarlos.

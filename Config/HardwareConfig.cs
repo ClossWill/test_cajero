@@ -94,9 +94,10 @@ public sealed class EscanerConfig
 public sealed class ImpresoraConfig
 {
     public string Modo { get; set; } = "Spooler";
-    public string NombreImpresora { get; set; } = "KP-80A";
+    public string NombreImpresora { get; set; } = "POS80 Printer";
     public string Puerto { get; set; } = "COM4";
     public int BaudRate { get; set; } = 115200;
+    public string NombreUsb { get; set; } = "POS80";
 }
 
 public sealed class SensoresConfig

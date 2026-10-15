@@ -7,7 +7,8 @@ Confirmar que el PC se comunica por puerto serial con los dos hoppers MK4 (ping 
 ## Protocolo / librería
 
 - **ccTalk** sobre puerto COM (8N1, normalmente 9600 baudios). Implementación mínima propia en `Protocolos/CcTalk.cs` (sin dependencias): trama `[destino][nº datos][origen=1][header][datos…][checksum]`, con suma total ≡ 0 mod 256. El código descarta el eco de la propia trama, habitual en la línea ccTalk de un solo hilo.
-- Headers usados: `254` Simple poll, `245` categoría de equipo, `244` código de producto, `241` revisión de software, `242` número de serie, `164` Enable hopper, `167` Dispense hopper coins, `166` Request hopper status.
+- Headers usados: `254` Simple poll, `245` categoría de equipo, `244` código de producto, `241` revisión de software, `242` número de serie, `163` Test hopper, `164` Enable hopper, `167` Dispense hopper coins, `166` Request hopper status, `217` Request high/low status (nivel de monedas).
+- Fuente de los comandos: `referencias_integracion/CoinDispenserMK4` (Shanghai Elan: "MK2 & MK4 Coin Dispensor Commands", "Programming Flow", "cctalk address"). Cubre poll, reset, enable, dispense, estado, test hopper y nivel de monedas.
 - Puerto: `System.IO.Ports` (paquete NuGet `System.IO.Ports` 8.0.0).
 
 ## Precondiciones
@@ -54,13 +55,16 @@ public sealed class CcTalkBus : IDisposable
     public const byte Host = 1;
 
     // Headers del estándar ccTalk (Generic Specification) usados en las pruebas.
+    public const byte HResetDevice = 1;
     public const byte HSimplePoll = 254;
     public const byte HRequestEquipmentCategory = 245;
     public const byte HRequestProductCode = 244;
     public const byte HRequestSerialNumber = 242;
     public const byte HRequestSoftwareRevision = 241;
+    public const byte HTestHopper = 163;
     public const byte HEnableHopper = 164;
     public const byte HRequestHopperStatus = 166;
+    public const byte HRequestHighLowStatus = 217;
     public const byte HDispenseHopperCoins = 167;
 
     private readonly SerialPort _puerto;
@@ -240,44 +244,63 @@ public static partial class HardwareTests
         }
     }
 
-    // Secuencia ccTalk de hopper: serie (242) -> Enable (164) -> Dispense (167) -> sondeo de estado (166).
-    // SUPUESTO A VERIFICAR con el manual del MK4: Dispense = [serie x3][cantidad] sin cifrado.
-    // Si el MK4 responde NAK, probablemente exige el modo seguro (Pump RNG 161 / Request cipher key 160).
+    // Secuencia ccTalk de hopper MK2/MK4 (doc. Shanghai Elan "MK2&MK4 Coin Dispenser Programming Flow"):
+    // Test hopper (163) -> Enable (164, dato 165) -> Dispense (167, 8 bytes en 0 + cantidad; sin cifrado) -> sondeo 166 cada 200 ms.
+    // El MK4 responde al Dispense con 1 byte de datos (contador de eventos), no con ACK vacío.
     private static void DispensarEnHopper(Reporte r, CcTalkBus bus, HopperConfig h, int cantidad)
     {
-        var serie = bus.Enviar(h.Direccion, CcTalkBus.HRequestSerialNumber);
-        if (!r.Criterio($"{h.Nombre}: lectura del número de serie", serie is { Datos.Length: >= 3 }, bus.UltimoError)) return;
+        var test = bus.Enviar(h.Direccion, CcTalkBus.HTestHopper);
+        if (!r.Criterio($"{h.Nombre}: Test Hopper responde", test is { Datos.Length: >= 2 }, bus.UltimoError)) return;
+        Consola.Info($"        Flags de error: {Consola.Hex(test!.Datos)} (byte1 bit3/4/5 = fraude/opto bloqueado)");
+        var nivel = bus.Enviar(h.Direccion, CcTalkBus.HRequestHighLowStatus);
+        if (nivel is { Datos.Length: 1 })
+            Consola.Info($"        Nivel de monedas: {nivel.Datos[0] switch { 0x30 => "suficiente", 0x31 => "casi vacío", 0x32 => "lleno", var x => $"desconocido ({x:X2})" }}");
 
         var enable = bus.Enviar(h.Direccion, CcTalkBus.HEnableHopper, new byte[] { 165 });
         if (!r.Criterio($"{h.Nombre}: Enable Hopper aceptado (ACK)", enable?.EsAck == true, bus.UltimoError)) return;
 
-        var datos = serie!.Datos.Take(3).Append((byte)cantidad).ToArray();
+        var datos = new byte[9];
+        datos[8] = (byte)cantidad;
         var disp = bus.Enviar(h.Direccion, CcTalkBus.HDispenseHopperCoins, datos);
-        if (!r.Criterio($"{h.Nombre}: comando Dispense aceptado (ACK)", disp?.EsAck == true,
+        if (!r.Criterio($"{h.Nombre}: comando Dispense aceptado (header 0, no NAK)", disp is { Header: 0 },
                 disp is null ? bus.UltimoError : $"header respuesta={disp.Header} datos={Consola.Hex(disp.Datos)}")) return;
 
-        // El hopper entrega ~3 monedas/s; margen amplio para atascos.
+        // Doc: sondear cada 200 ms; reintentar si no hay respuesta (el motor genera ruido); ~10 fallos seguidos = falla de hardware.
         var limite = DateTime.UtcNow.AddSeconds(cantidad + 8);
         byte pagadas = 0, noPagadas = 0, restantes = (byte)cantidad;
-        while (DateTime.UtcNow < limite)
+        int fallosSeguidos = 0;
+        while (DateTime.UtcNow < limite && fallosSeguidos < 10)
         {
-            var estado = bus.Enviar(h.Direccion, CcTalkBus.HRequestHopperStatus);
+            var estado = bus.Enviar(h.Direccion, CcTalkBus.HRequestHopperStatus, null, 100);
             if (estado is { Datos.Length: >= 4 })
             {
+                fallosSeguidos = 0;
                 restantes = estado.Datos[1]; pagadas = estado.Datos[2]; noPagadas = estado.Datos[3];
                 if (restantes == 0) break;
+                Thread.Sleep(200);
             }
-            Thread.Sleep(250);
+            else fallosSeguidos++;
         }
 
         r.Criterio($"{h.Nombre}: el hopper reporta {cantidad} moneda(s) pagadas y 0 sin pagar",
             pagadas == cantidad && noPagadas == 0 && restantes == 0,
             $"pagadas={pagadas} sinPagar={noPagadas} restantes={restantes}");
-        r.Criterio($"{h.Nombre}: confirmación física de {cantidad} moneda(s) de ${h.Denominacion} en la bandeja",
-            Consola.Confirmar($"¿Cayeron {cantidad} moneda(s) de ${h.Denominacion}?"));
+        var caidas = Consola.PreguntarNumeroAsistente($"¿Cuántas monedas de ${h.Denominacion} cayeron en la bandeja?");
+        r.Criterio($"{h.Nombre}: el asistente cuenta {cantidad} moneda(s) de ${h.Denominacion} en la bandeja",
+            caidas == cantidad, $"asistente={caidas?.ToString() ?? "sin respuesta"}");
     }
 }
 ```
+
+## Modalidad remota (desarrollador a distancia + asistente en sitio)
+
+`Test_PingMonederos` no requiere al asistente: es puramente eléctrico/serial. `Test_DispensarMonedas` sí lo necesita, una vez por hopper, solo para contar lo que cayó:
+
+| Momento | Qué pasa en consola | Qué hace el asistente |
+| :-- | :-- | :-- |
+| Al terminar de dispensar cada hopper | "¿Cuántas monedas de \$N cayeron en la bandeja?" | Las cuenta sin tocarlas y dice el número (ver `Guia_Asistente_Sitio.md`, sección Monederos) |
+
+No hay `AntesDeMover`: el mecanismo del hopper es un tambor cerrado, no hay un shutter donde el asistente pueda tener la mano dentro.
 
 ## Cómo ejecutar
 
@@ -307,10 +330,10 @@ HardwareTests.Test_DispensarMonedas(2, 1); // dos monedas de $1, una de $5
 ## Supuestos y riesgos
 
 - **Confirmado por el TAC §2:** Monedero 1 entrega MXN 1 y Monedero 2 entrega MXN 5; la configuración de `Hoppers` coincide.
-- **Falta la fuente de los comandos:** el BEEX indica que los bytes específicos están en "las tablas de Excel de la carpeta de integración", que no se han recibido. Esas tablas deben contrastarse con `CcTalk.cs` antes de dar por buenos los puntos siguientes. Además el BEEX recomienda usar una librería ccTalk de código abierto; este código usa una implementación mínima propia.
-- **Formato del comando Dispense (167):** se asume `[serie x3][cantidad]` sin cifrado. Si el MK4 responde NAK, requiere modo seguro (Pump RNG `161`, Request cipher key `160`); sería un trabajo adicional del día 2.
-- Direcciones 3 y 4 son una suposición; si nadie responde, barrer las direcciones 1–10 con Simple Poll.
+- **Dispense (167), confirmado por el fabricante:** 9 bytes de datos = 8 en `00` + cantidad (1–255), sin cifrado (modo por defecto). El MK4 responde con 1 byte de datos (contador de eventos), por eso no se exige ACK vacío. Sondear `166` cada 200 ms con reintentos (~10 seguidos antes de declarar falla). El BEEX recomienda usar una librería ccTalk de código abierto; este código usa una implementación mínima propia, ya validada contra el manual del fabricante.
+- Las direcciones ccTalk se fijan por pines del hopper (tabla en "MK2 cctalk address.pdf": 3 = por defecto, 4, 5...). Cada hopper debe tener una distinta; si nadie responde, barrer 1–10 con Simple Poll.
 - Conviene que el primer intento use cantidades pequeñas (1 moneda) y vigilar atascos.
+- **Sin probar aún en la máquina real** (2026-10-14): el código compila; falta ejecutar `Test_PingMonederos` y `Test_DispensarMonedas` frente al hardware.
 
 ## Evidencia a guardar
 

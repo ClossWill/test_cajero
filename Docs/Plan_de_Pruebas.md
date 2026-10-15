@@ -10,7 +10,7 @@
 | 0 | Entorno y estructura | .NET 8, `System.IO.Ports` | – (menú) | este documento |
 | 1 | Recicladora GRG 9250N | `CRM9250NDev.dll` vía `CRM9250N.cs` | `Test_InicializarRecicladora`, `Test_AceptarBilletes`, `Test_DispensarBilletes` | [Prueba_Dia1_Recicladora.md](Prueba_Dia1_Recicladora.md) |
 | 2 | Monederos MK4 (x2) | ccTalk sobre COM | `Test_PingMonederos`, `Test_DispensarMonedas` | [Prueba_Dia2_Monederos.md](Prueba_Dia2_Monederos.md) |
-| 3 | Impresora KP-80A | ESC/POS (spooler USB o COM) | `Test_ImprimirVoucherPrueba` | [Prueba_Dia3_Impresora.md](Prueba_Dia3_Impresora.md) |
+| 3 | Impresora KP-80A | ESC/POS (spooler USB o COM) + SDK nativo (USB autoreply, canal de producción) | `Test_ImprimirVoucherPrueba` | [Prueba_Dia3_Impresora.md](Prueba_Dia3_Impresora.md) |
 | 4 | Módulo ALB02 (sensores) | Serial reactivo (COM) | `Test_CalibrarSensores`, `Test_EscucharSensores` | [Prueba_Dia4_Sensores.md](Prueba_Dia4_Sensores.md) |
 | 5 | Escáner MEPR500+ | SDK propietario | `Test_EscanearDocumento` | [Prueba_Dia5_Escaner.md](Prueba_Dia5_Escaner.md) |
 | 6 | Cierre y regresión | – | Todos, en secuencia | sección 5 |
@@ -35,7 +35,7 @@ hardware.json              puertos COM, direcciones y supuestos (se edita en la 
 CRM9250N.cs                fuente nativa del fabricante (sin modificar)
 Config/HardwareConfig.cs   carga de hardware.json
 Helpers/                   Consola (salida), Reporte (criterios), Native (marshaling)
-Protocolos/                CcTalk, EscPos + ImpresoraRaw, SerialTramas
+Protocolos/                CcTalk, EscPos + ImpresoraRaw, AutoReplyPrintSdk, SerialTramas
 Tests/                     una clase parcial HardwareTests por periférico
 Docs/                      estos documentos
 ```
@@ -54,14 +54,17 @@ using IntegracionCajeroPruebas.Tests;
 Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
+Bitacora.Iniciar(); // después de fijar la codificación: envuelve Console.Out/In ya configurados
 
 Console.WriteLine("Iniciando Pruebas de Hardware FINSO...");
+Console.WriteLine($"Bitácora de la sesión: {Bitacora.Ruta ?? "(desactivada)"}");
 Console.WriteLine($"Proceso de {(Environment.Is64BitProcess ? 64 : 32)} bits | config: {HardwareConfig.RutaArchivo}"
                   + (File.Exists(HardwareConfig.RutaArchivo) ? "" : " (no existe: se usan valores por defecto)"));
 
 var menu = new (string Clave, string Texto, Action Accion)[]
 {
-    ("1", "Recicladora  - Inicializar",              HardwareTests.Test_InicializarRecicladora),
+    ("1", "Recicladora  - Inicializar (conecta, sin movimiento)", () => HardwareTests.Test_InicializarRecicladora()),
+    ("11", "Recicladora - Reinicio mecánico (iPowerOnInitEx, SE MUEVE)", () => HardwareTests.Test_InicializarRecicladora(reinicioMecanico: true)),
     ("2", "Recicladora  - Aceptar billetes",         () => HardwareTests.Test_AceptarBilletes()),
     ("3", "Recicladora  - Dispensar billetes",       () => HardwareTests.Test_DispensarBilletes(
                                                          PedirEntero("Cantidad de billetes", 1), PedirTexto("Moneda (MXN/USD)", "MXN"),
@@ -117,7 +120,18 @@ static string PedirTexto(string pregunta, string porDefecto)
 
 ### Helpers compartidos
 
-`Reporte` acumula los criterios de aceptación de cada prueba y emite `APROBADO`/`RECHAZADO` al final. Las confirmaciones físicas (¿cayeron las monedas?, ¿cortó el papel?) se piden por consola con `Consola.Confirmar`.
+`Reporte` acumula los criterios de aceptación de cada prueba y emite `APROBADO`/`RECHAZADO` al final.
+
+**Pruebas en remoto.** El desarrollador opera la consola a distancia y un asistente en sitio manipula la máquina. `Guia_Asistente_Sitio.md` es la guía no técnica para el asistente, con una sección por prueba que lo necesita (recicladora, monederos, impresora). Todo lo que se le dice al asistente sale en magenta con el prefijo `>> ASISTENTE:` para leérselo tal cual; el desarrollador teclea lo que responde. `Consola` ofrece:
+
+| Método | Uso |
+| :-- | :-- |
+| `AntesDeMover` | Antes de cada movimiento mecánico (`!! VA A MOVERSE`). Si el asistente no está listo, la prueba se detiene sin mover nada y queda en `RECHAZADO` |
+| `Asistente` | Instrucción física; bloquea hasta que el asistente dice "listo". Se usa siempre antes de cerrar o abrir el shutter con billetes dentro |
+| `PreguntarNumeroAsistente` | Conteos (billetes en el shutter, monedas en la bandeja). Se pide el número y no un sí/no sobre el esperado, para no inducir la respuesta |
+| `PreguntarAsistente` / `PreguntarTextoAsistente` | Observaciones de sí/no y datos libres (qué billete va a insertar) |
+
+`Bitacora` copia la consola completa (salida y lo tecleado) a `bitacoras\sesion_AAAAMMDD_HHMMSS.txt`, junto al `.exe`. Cada prueba imprime su hora de inicio para cruzarla con los logs del SDK de GRG.
 
 ```csharp
 namespace IntegracionCajeroPruebas.Helpers;
@@ -132,6 +146,7 @@ public sealed class Reporte
     {
         _titulo = titulo;
         Consola.Titulo(titulo);
+        Consola.Info($"Inicio: {DateTime.Now:yyyy-MM-dd HH:mm:ss} (para cruzar con los logs del SDK)");
     }
 
     public bool Criterio(string descripcion, bool cumple, string? detalle = null)
@@ -151,6 +166,158 @@ public sealed class Reporte
         var texto = $"RESULTADO {_titulo}: {(ok ? "APROBADO" : "RECHAZADO")} ({aprobados}/{_criterios.Count} criterios)";
         if (ok) Consola.Ok(texto); else Consola.Error(texto);
         return ok;
+    }
+}
+```
+
+```csharp
+namespace IntegracionCajeroPruebas.Helpers;
+
+public static class Consola
+{
+    public static void Titulo(string texto)
+    {
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine(new string('=', 70));
+        Console.WriteLine(texto);
+        Console.WriteLine(new string('=', 70));
+        Console.ResetColor();
+    }
+
+    public static void Info(string texto) => Escribir(texto, ConsoleColor.Gray);
+    public static void Ok(string texto) => Escribir(texto, ConsoleColor.Green);
+    public static void Error(string texto) => Escribir(texto, ConsoleColor.Red);
+    public static void Aviso(string texto) => Escribir(texto, ConsoleColor.Yellow);
+
+    public static void Esperar(string mensaje)
+    {
+        Aviso(mensaje);
+        Console.ReadLine();
+    }
+
+    public static bool Confirmar(string pregunta)
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.Write($"{pregunta} [s/N]: ");
+        Console.ResetColor();
+        var r = Console.ReadLine()?.Trim().ToLowerInvariant();
+        return r is "s" or "si" or "sí" or "y";
+    }
+
+    // Pruebas en remoto: el desarrollador opera la consola y un asistente en sitio manipula la máquina.
+    // Las líneas ">> ASISTENTE" se le leen tal cual (teléfono o videollamada); el desarrollador teclea lo que responde.
+
+    /// <summary>Aviso para el asistente que no espera respuesta.</summary>
+    public static void AvisarAsistente(string texto) => Escribir($"  >> ASISTENTE: {texto}", ConsoleColor.Magenta);
+
+    /// <summary>Instrucción física para el asistente. Bloquea hasta que diga "listo".</summary>
+    public static void Asistente(string instruccion)
+    {
+        AvisarAsistente(instruccion);
+        Esperar("     ENTER cuando el asistente diga \"listo\"...");
+    }
+
+    /// <summary>Pregunta de sí/no sobre lo que el asistente ve u oye.</summary>
+    public static bool PreguntarAsistente(string pregunta)
+    {
+        AvisarAsistente(pregunta);
+        return Confirmar("     Respuesta del asistente");
+    }
+
+    /// <summary>Pide un número (p. ej. cuántos billetes ve). Preguntar el número y no confirmar el esperado evita respuestas inducidas.</summary>
+    public static int? PreguntarNumeroAsistente(string pregunta)
+    {
+        AvisarAsistente(pregunta);
+        Console.Write("     Número que dice el asistente: ");
+        return int.TryParse(Console.ReadLine()?.Trim(), out var n) ? n : null;
+    }
+
+    public static string PreguntarTextoAsistente(string pregunta)
+    {
+        AvisarAsistente(pregunta);
+        Console.Write("     Respuesta del asistente: ");
+        return Console.ReadLine()?.Trim() ?? "";
+    }
+
+    /// <summary>Aviso previo a un movimiento mecánico. false = el asistente no está listo y la prueba no debe moverse.</summary>
+    public static bool AntesDeMover(string movimiento)
+    {
+        Escribir($"  !! VA A MOVERSE: {movimiento}", ConsoleColor.Red);
+        AvisarAsistente("manos fuera del shutter y de las bandejas; avise cuando esté listo.");
+        return Confirmar("     ¿El asistente está listo?");
+    }
+
+    public static string Hex(IEnumerable<byte> bytes) => string.Join(' ', bytes.Select(b => b.ToString("X2")));
+
+    /// <summary>Convierte "AA 01 0x02" / "AA0102" a bytes. Cadena vacía devuelve null.</summary>
+    public static byte[]? ParseHex(string? texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto)) return null;
+        var limpio = texto.Replace("0x", "", StringComparison.OrdinalIgnoreCase)
+                          .Replace(" ", "").Replace("-", "");
+        return Convert.FromHexString(limpio);
+    }
+
+    private static void Escribir(string texto, ConsoleColor color)
+    {
+        Console.ForegroundColor = color;
+        Console.WriteLine(texto);
+        Console.ResetColor();
+    }
+}
+```
+
+```csharp
+using System.Text;
+
+namespace IntegracionCajeroPruebas.Helpers;
+
+/// <summary>
+/// Copia todo lo que sale y entra por consola a bitacoras\sesion_*.txt (junto al .exe), para revisar o compartir
+/// la corrida completa en remoto, incluidas las respuestas del asistente que teclea el desarrollador.
+/// </summary>
+public static class Bitacora
+{
+    public static string? Ruta { get; private set; }
+
+    public static void Iniciar()
+    {
+        try
+        {
+            var dir = Path.Combine(AppContext.BaseDirectory, "bitacoras");
+            Directory.CreateDirectory(dir);
+            Ruta = Path.Combine(dir, $"sesion_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+            var archivo = new StreamWriter(Ruta, append: false, new UTF8Encoding(false)) { AutoFlush = true };
+            Console.SetOut(new Duplicador(Console.Out, archivo));
+            Console.SetIn(new EcoEntrada(Console.In, archivo));
+        }
+        catch (Exception ex)
+        {
+            Ruta = null;
+            Consola.Aviso($"Sin bitácora: {ex.Message}");
+        }
+    }
+
+    private sealed class Duplicador(TextWriter consola, TextWriter archivo) : TextWriter
+    {
+        public override Encoding Encoding => consola.Encoding;
+        public override void Write(char value) { consola.Write(value); archivo.Write(value); }
+        public override void Write(string? value) { consola.Write(value); archivo.Write(value); }
+        public override void WriteLine(string? value) { consola.WriteLine(value); archivo.WriteLine(value); }
+        public override void Flush() { consola.Flush(); archivo.Flush(); }
+    }
+
+    private sealed class EcoEntrada(TextReader consola, TextWriter archivo) : TextReader
+    {
+        public override string? ReadLine()
+        {
+            var linea = consola.ReadLine();
+            archivo.WriteLine(linea ?? "<fin de entrada>");
+            return linea;
+        }
+        public override int Read() => consola.Read();
+        public override int Peek() => consola.Peek();
     }
 }
 ```
@@ -265,10 +432,11 @@ public sealed class NativeScope : IDisposable
     "TimeoutSegundos": 30
   },
   "Impresora": {
-    "Modo": "Spooler",                       // "Spooler" (USB, cola de Windows RAW) o "Serial"
-    "NombreImpresora": "KP-80A",             // VERIFICAR nombre exacto: Get-Printer
+    "Modo": "Spooler",                       // "Spooler" (USB, cola de Windows RAW), "Serial" o "UsbSdk" (SDK del fabricante, canal de producción)
+    "NombreImpresora": "POS80 Printer",       // cola instalada por el driver POS80 (Get-Printer, 2026-10-14)
     "Puerto": "COM4",
-    "BaudRate": 115200
+    "BaudRate": 115200,
+    "NombreUsb": "POS80"                     // nombre pasado a CP_Port_OpenUsb (modo UsbSdk); sirve cualquier texto si solo hay 1 impresora USB
   },
   "Sensores": {
     "Puerto": "COM5",
@@ -311,15 +479,17 @@ public sealed class NativeScope : IDisposable
 | :-- | :-- | :-- | :-- |
 | 1 | ~~Nombre lógico y código de éxito~~ **Confirmado:** `CRM9250NDev`, `rc == 0` (demo y PDF de GRG) | `Recicladora.*` | – |
 | 2 | ~~`byDispType` e `Indice` de casete~~ **Confirmado:** `1` = por casete; RC1..RC4 = 1..4 | `TipoDispensa`, `Casetes[].Indice` | Probar con 1 billete por casete |
-| 3 | Dispense de hopper = `[serie x3][cantidad]` sin cifrado | `Monederos.cs` | Manual MK4; si responde NAK, implementar Pump RNG (161) / cipher (160) |
+| 3 | ~~Dispense de hopper~~ **Confirmado (doc. MK4):** 8 bytes en 0 + cantidad, sin cifrado; responde con contador de eventos | `Monederos.cs` | Probar con 1 moneda |
 | 4 | Direcciones ccTalk de los hoppers (3 y 4) | `Monederos.Hoppers` | Si no responden, hacer barrido de direcciones 1–10 |
 | 5 | Formato de tramas del ALB02 | `Sensores.Tramas` | `Test_CalibrarSensores` |
 | 6 | API del SDK del MEPR500+ | `EscanerMeprSdk` | Documentación y DLL del fabricante |
 | 7 | ~~Bits de la DLL~~ **Confirmado:** x86. Falta `DevBaseDll.dll` en el zip del SDK | `.csproj` | El pre-vuelo del menú 1 lo detecta |
+| 8 | ~~Nombre de la cola de la impresora~~ **Confirmado:** `POS80 Printer` (driver POS80), no "KP-80A" | `Impresora.NombreImpresora` | `Get-Printer` |
+| 9 | Modo `UsbSdk` de la impresora (canal recomendado para producción) sin probar en hardware real | `AutoReplyPrintSdk.cs` | `Test_ImprimirVoucherPrueba` con `Modo: "UsbSdk"` |
 
 ## 4. Convenciones de evidencia
 
-Para cada prueba guardar en `Evidencia/DiaN/`: captura de la consola con el resultado `APROBADO`/`RECHAZADO`, foto o video corto del comportamiento físico y, en la impresora, el voucher físico. Las tramas crudas (ccTalk, ALB02) se pegan tal como aparecen en consola.
+Para cada prueba guardar en `Evidencia/DiaN/`: la bitácora de la sesión (`bitacoras\sesion_*.txt`) con el resultado `APROBADO`/`RECHAZADO`, foto o video corto del comportamiento físico y, en la impresora, el voucher físico. Las tramas crudas (ccTalk, ALB02) se pegan tal como aparecen en consola.
 
 ## 5. Día 6 – Cierre y regresión
 

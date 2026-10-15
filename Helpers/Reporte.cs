@@ -10,6 +10,7 @@ public sealed class Reporte
     {
         _titulo = titulo;
         Consola.Titulo(titulo);
+        Consola.Info($"Inicio: {DateTime.Now:yyyy-MM-dd HH:mm:ss} (para cruzar con los logs del SDK)");
     }
 
     public bool Criterio(string descripcion, bool cumple, string? detalle = null)

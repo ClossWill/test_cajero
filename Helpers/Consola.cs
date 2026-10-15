@@ -32,6 +32,49 @@ public static class Consola
         return r is "s" or "si" or "sí" or "y";
     }
 
+    // Pruebas en remoto: el desarrollador opera la consola y un asistente en sitio manipula la máquina.
+    // Las líneas ">> ASISTENTE" se le leen tal cual (teléfono o videollamada); el desarrollador teclea lo que responde.
+
+    /// <summary>Aviso para el asistente que no espera respuesta.</summary>
+    public static void AvisarAsistente(string texto) => Escribir($"  >> ASISTENTE: {texto}", ConsoleColor.Magenta);
+
+    /// <summary>Instrucción física para el asistente. Bloquea hasta que diga "listo".</summary>
+    public static void Asistente(string instruccion)
+    {
+        AvisarAsistente(instruccion);
+        Esperar("     ENTER cuando el asistente diga \"listo\"...");
+    }
+
+    /// <summary>Pregunta de sí/no sobre lo que el asistente ve u oye.</summary>
+    public static bool PreguntarAsistente(string pregunta)
+    {
+        AvisarAsistente(pregunta);
+        return Confirmar("     Respuesta del asistente");
+    }
+
+    /// <summary>Pide un número (p. ej. cuántos billetes ve). Preguntar el número y no confirmar el esperado evita respuestas inducidas.</summary>
+    public static int? PreguntarNumeroAsistente(string pregunta)
+    {
+        AvisarAsistente(pregunta);
+        Console.Write("     Número que dice el asistente: ");
+        return int.TryParse(Console.ReadLine()?.Trim(), out var n) ? n : null;
+    }
+
+    public static string PreguntarTextoAsistente(string pregunta)
+    {
+        AvisarAsistente(pregunta);
+        Console.Write("     Respuesta del asistente: ");
+        return Console.ReadLine()?.Trim() ?? "";
+    }
+
+    /// <summary>Aviso previo a un movimiento mecánico. false = el asistente no está listo y la prueba no debe moverse.</summary>
+    public static bool AntesDeMover(string movimiento)
+    {
+        Escribir($"  !! VA A MOVERSE: {movimiento}", ConsoleColor.Red);
+        AvisarAsistente("manos fuera del shutter y de las bandejas; avise cuando esté listo.");
+        return Confirmar("     ¿El asistente está listo?");
+    }
+
     public static string Hex(IEnumerable<byte> bytes) => string.Join(' ', bytes.Select(b => b.ToString("X2")));
 
     /// <summary>Convierte "AA 01 0x02" / "AA0102" a bytes. Cadena vacía devuelve null.</summary>

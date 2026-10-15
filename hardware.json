@@ -36,10 +36,11 @@
     "TimeoutSegundos": 30
   },
   "Impresora": {
-    "Modo": "Spooler",                       // "Spooler" (USB, cola de Windows RAW) o "Serial"
-    "NombreImpresora": "KP-80A",             // VERIFICAR nombre exacto: Get-Printer
+    "Modo": "Spooler",                       // "Spooler" (USB, cola de Windows RAW), "Serial" o "UsbSdk" (SDK del fabricante, canal de producción)
+    "NombreImpresora": "POS80 Printer",       // cola instalada por el driver POS80 (Get-Printer, 2026-10-14)
     "Puerto": "COM4",
-    "BaudRate": 115200
+    "BaudRate": 115200,
+    "NombreUsb": "POS80"                     // nombre pasado a CP_Port_OpenUsb (modo UsbSdk); sirve cualquier texto si solo hay 1 impresora USB
   },
   "Sensores": {
     "Puerto": "COM5",

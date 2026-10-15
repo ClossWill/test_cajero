@@ -81,40 +81,49 @@ public static partial class HardwareTests
         }
     }
 
-    // Secuencia ccTalk de hopper: serie (242) -> Enable (164) -> Dispense (167) -> sondeo de estado (166).
-    // SUPUESTO A VERIFICAR con el manual del MK4: Dispense = [serie x3][cantidad] sin cifrado.
-    // Si el MK4 responde NAK, probablemente exige el modo seguro (Pump RNG 161 / Request cipher key 160).
+    // Secuencia ccTalk de hopper MK2/MK4 (doc. Shanghai Elan "MK2&MK4 Coin Dispenser Programming Flow"):
+    // Test hopper (163) -> Enable (164, dato 165) -> Dispense (167, 8 bytes en 0 + cantidad; sin cifrado) -> sondeo 166 cada 200 ms.
+    // El MK4 responde al Dispense con 1 byte de datos (contador de eventos), no con ACK vacío.
     private static void DispensarEnHopper(Reporte r, CcTalkBus bus, HopperConfig h, int cantidad)
     {
-        var serie = bus.Enviar(h.Direccion, CcTalkBus.HRequestSerialNumber);
-        if (!r.Criterio($"{h.Nombre}: lectura del número de serie", serie is { Datos.Length: >= 3 }, bus.UltimoError)) return;
+        var test = bus.Enviar(h.Direccion, CcTalkBus.HTestHopper);
+        if (!r.Criterio($"{h.Nombre}: Test Hopper responde", test is { Datos.Length: >= 2 }, bus.UltimoError)) return;
+        Consola.Info($"        Flags de error: {Consola.Hex(test!.Datos)} (byte1 bit3/4/5 = fraude/opto bloqueado)");
+        var nivel = bus.Enviar(h.Direccion, CcTalkBus.HRequestHighLowStatus);
+        if (nivel is { Datos.Length: 1 })
+            Consola.Info($"        Nivel de monedas: {nivel.Datos[0] switch { 0x30 => "suficiente", 0x31 => "casi vacío", 0x32 => "lleno", var x => $"desconocido ({x:X2})" }}");
 
         var enable = bus.Enviar(h.Direccion, CcTalkBus.HEnableHopper, new byte[] { 165 });
         if (!r.Criterio($"{h.Nombre}: Enable Hopper aceptado (ACK)", enable?.EsAck == true, bus.UltimoError)) return;
 
-        var datos = serie!.Datos.Take(3).Append((byte)cantidad).ToArray();
+        var datos = new byte[9];
+        datos[8] = (byte)cantidad;
         var disp = bus.Enviar(h.Direccion, CcTalkBus.HDispenseHopperCoins, datos);
-        if (!r.Criterio($"{h.Nombre}: comando Dispense aceptado (ACK)", disp?.EsAck == true,
+        if (!r.Criterio($"{h.Nombre}: comando Dispense aceptado (header 0, no NAK)", disp is { Header: 0 },
                 disp is null ? bus.UltimoError : $"header respuesta={disp.Header} datos={Consola.Hex(disp.Datos)}")) return;
 
-        // El hopper entrega ~3 monedas/s; margen amplio para atascos.
+        // Doc: sondear cada 200 ms; reintentar si no hay respuesta (el motor genera ruido); ~10 fallos seguidos = falla de hardware.
         var limite = DateTime.UtcNow.AddSeconds(cantidad + 8);
         byte pagadas = 0, noPagadas = 0, restantes = (byte)cantidad;
-        while (DateTime.UtcNow < limite)
+        int fallosSeguidos = 0;
+        while (DateTime.UtcNow < limite && fallosSeguidos < 10)
         {
-            var estado = bus.Enviar(h.Direccion, CcTalkBus.HRequestHopperStatus);
+            var estado = bus.Enviar(h.Direccion, CcTalkBus.HRequestHopperStatus, null, 100);
             if (estado is { Datos.Length: >= 4 })
             {
+                fallosSeguidos = 0;
                 restantes = estado.Datos[1]; pagadas = estado.Datos[2]; noPagadas = estado.Datos[3];
                 if (restantes == 0) break;
+                Thread.Sleep(200);
             }
-            Thread.Sleep(250);
+            else fallosSeguidos++;
         }
 
         r.Criterio($"{h.Nombre}: el hopper reporta {cantidad} moneda(s) pagadas y 0 sin pagar",
             pagadas == cantidad && noPagadas == 0 && restantes == 0,
             $"pagadas={pagadas} sinPagar={noPagadas} restantes={restantes}");
-        r.Criterio($"{h.Nombre}: confirmación física de {cantidad} moneda(s) de ${h.Denominacion} en la bandeja",
-            Consola.Confirmar($"¿Cayeron {cantidad} moneda(s) de ${h.Denominacion}?"));
+        var caidas = Consola.PreguntarNumeroAsistente($"¿Cuántas monedas de ${h.Denominacion} cayeron en la bandeja?");
+        r.Criterio($"{h.Nombre}: el asistente cuenta {cantidad} moneda(s) de ${h.Denominacion} en la bandeja",
+            caidas == cantidad, $"asistente={caidas?.ToString() ?? "sin respuesta"}");
     }
 }

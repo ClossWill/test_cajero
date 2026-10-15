@@ -10,6 +10,17 @@
 - Todo se desarrolló en una **laptop sin hardware**. Nada se ha probado contra un periférico real. Lo único ejecutado es el pre-vuelo de la DLL y el arranque del menú.
 - Siguiente paso en la IoT: ejecutar la opción `1` del menú y analizar la salida (sección 6).
 
+### Actualización 2026-10-13 (ya en la IoT)
+
+- **Inicialización de la recicladora: APROBADO (11/11).** Firmware `v6.07B174`, RC1..RC4 presentes (`status=4`), shutter cerrado, sin billetes en NF/NE. Con la DLL del repo (v2.3.7.6).
+- Entorno de la IoT:
+  - `DevBaseDll.dll` ya estaba en `C:\Windows\SysWOW64` (v3.3.3.96). No hay que copiarla.
+  - Driver GRG del fabricante en `C:\Program Files (x86)\GrgBanking\GRGDevDriver` (`CRM9250NDev.dll` v2.3.2.4). Sirve de control si la del repo falla.
+  - USB: `PID_8016` (CRM9250N) y `PID_8017` (validador SNV-003). COM13/COM14 = puente CP210x doble (¿monederos/ALB02?, por verificar).
+  - Sin administrador ni `winget`. .NET 8 se instaló por usuario con `dotnet-install.ps1`: SDK 8.0.426 x64 en `%LOCALAPPDATA%\Microsoft\dotnet`, runtime x86 8.0.32 en `%LOCALAPPDATA%\Microsoft\dotnet-x86`. Se fijó la variable de usuario `DOTNET_ROOT(x86)` a esta última carpeta.
+  - El `dotnet` del PATH es el de la máquina (solo runtime 10, sin SDK). Para compilar hay que usar la ruta completa: `& "$env:LOCALAPPDATA\Microsoft\dotnet\dotnet.exe" build`.
+  - Desde bash: `printf '1\n0\n' | env "DOTNET_ROOT(x86)=$LOCALAPPDATA\\Microsoft\\dotnet-x86" ./FinsoHardwareTests.exe` (`export` no admite paréntesis).
+
 ## 2. Qué hay en la carpeta
 
 ```
