@@ -16,53 +16,90 @@ Console.WriteLine($"Bitácora de la sesión: {Bitacora.Ruta ?? "(desactivada)"}"
 Console.WriteLine($"Proceso de {(Environment.Is64BitProcess ? 64 : 32)} bits | config: {HardwareConfig.RutaArchivo}"
                   + (File.Exists(HardwareConfig.RutaArchivo) ? "" : " (no existe: se usan valores por defecto)"));
 
-var menu = new (string Clave, string Texto, Action Accion)[]
+var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)[] Pruebas)[]
 {
-    ("1", "Recicladora  - Inicializar (conecta, sin movimiento)", () => HardwareTests.Test_InicializarRecicladora()),
-    ("11", "Recicladora - Reinicio mecánico (iPowerOnInitEx, SE MUEVE)", () => HardwareTests.Test_InicializarRecicladora(reinicioMecanico: true)),
-    ("2", "Recicladora  - Aceptar billetes",         () => HardwareTests.Test_AceptarBilletes()),
-    ("3", "Recicladora  - Dispensar billetes",       () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa())),
-    ("10", "Recicladora - Billete inválido (espera rechazo)", () => HardwareTests.Test_AceptarBilletes(esperaRechazo: true)),
-    ("20", "Recicladora - Abrir shutter (control manual)",    HardwareTests.Test_AbrirShutter),
-    ("21", "Recicladora - Cerrar shutter (control manual)",   HardwareTests.Test_CerrarShutter),
-    ("4", "Monederos    - Ping ccTalk",              HardwareTests.Test_PingMonederos),
-    ("5", "Monederos    - Dispensar monedas",        () => HardwareTests.Test_DispensarMonedas(
-                                                         PedirEntero("Monedas de $1", 2), PedirEntero("Monedas de $5", 1))),
-    ("6", "Impresora    - Voucher de prueba",        HardwareTests.Test_ImprimirVoucherPrueba),
-    ("14", "Impresora   - Voucher de operación (logo + formato tradicional)", HardwareTests.Test_ImprimirVoucherOperacion),
-    ("15", "Impresora   - Ping (conexión, sin imprimir)", HardwareTests.Test_PingImpresora),
-    ("7", "Sensores     - Calibrar tramas ALB02",    HardwareTests.Test_CalibrarSensores),
-    ("8", "Sensores     - Escuchar (puerta/vibración)", HardwareTests.Test_EscucharSensores),
-    ("16", "Sensores    - Ping (abre el puerto COM)", HardwareTests.Test_PingSensores),
-    ("9", "Escáner      - Leer documento",           HardwareTests.Test_EscanearDocumento),
-    ("17", "Escáner     - Ping (inicializa SDK, sin leer)", HardwareTests.Test_PingEscaner),
-    ("12", "LEDs        - Control de indicadores (18 canales)", HardwareTests.Test_ControlarLeds),
-    ("18", "LEDs        - Ping (firmware)",          HardwareTests.Test_PingLeds),
-    ("13", "Cámara      - Capturar foto (item 12 BEEX)",         HardwareTests.Test_CapturarRostro),
-    ("19", "Cámara      - Ping (abre el dispositivo)", HardwareTests.Test_PingCamara),
+    ("Recicladora", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("1", "Inicializar (conecta, sin movimiento)", () => HardwareTests.Test_InicializarRecicladora()),
+        ("11", "Reinicio mecánico (iPowerOnInitEx, SE MUEVE)", () => HardwareTests.Test_InicializarRecicladora(reinicioMecanico: true)),
+        ("2", "Aceptar billetes",         () => HardwareTests.Test_AceptarBilletes()),
+        ("3", "Dispensar billetes",       () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa())),
+        ("10", "Billete inválido (espera rechazo)", () => HardwareTests.Test_AceptarBilletes(esperaRechazo: true)),
+        ("20", "Abrir shutter (control manual)",    HardwareTests.Test_AbrirShutter),
+        ("21", "Cerrar shutter (control manual)",   HardwareTests.Test_CerrarShutter),
+    }),
+    ("Monederos", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("4", "Ping ccTalk",              HardwareTests.Test_PingMonederos),
+        ("5", "Dispensar monedas",        () => HardwareTests.Test_DispensarMonedas(
+                                               PedirEntero("Monedas de $1", 2), PedirEntero("Monedas de $5", 1))),
+    }),
+    ("Impresora", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("6", "Voucher de prueba",        HardwareTests.Test_ImprimirVoucherPrueba),
+        ("14", "Voucher de operación (logo + formato tradicional)", HardwareTests.Test_ImprimirVoucherOperacion),
+        ("15", "Ping (conexión, sin imprimir)", HardwareTests.Test_PingImpresora),
+    }),
+    ("Sensores", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("7", "Calibrar tramas ALB02",    HardwareTests.Test_CalibrarSensores),
+        ("8", "Escuchar (puerta/vibración)", HardwareTests.Test_EscucharSensores),
+        ("16", "Ping (abre el puerto COM)", HardwareTests.Test_PingSensores),
+    }),
+    ("Escáner", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("9", "Leer documento",           HardwareTests.Test_EscanearDocumento),
+        ("17", "Ping (inicializa SDK, sin leer)", HardwareTests.Test_PingEscaner),
+    }),
+    ("LEDs", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("12", "Control de indicadores (18 canales)", HardwareTests.Test_ControlarLeds),
+        ("18", "Ping (firmware)",          HardwareTests.Test_PingLeds),
+    }),
+    ("Cámara", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("13", "Capturar foto (item 12 BEEX)",         HardwareTests.Test_CapturarRostro),
+        ("19", "Ping (abre el dispositivo)", HardwareTests.Test_PingCamara),
+    }),
 };
 
 while (true)
 {
     Console.WriteLine();
     Console.WriteLine("========== MENÚ DE PRUEBAS ==========");
-    Console.WriteLine("  --- FASE 1 (foco actual): recicladora de efectivo ---");
-    foreach (var (clave, texto, _) in menu)
-    {
-        if (clave == "4") Console.WriteLine("  --- Fases posteriores (aún no se validan) ---");
-        Console.WriteLine($"  {clave}. {texto}");
-    }
+    for (var i = 0; i < categorias.Length; i++)
+        Console.WriteLine($"  {i + 1}. {categorias[i].Nombre}");
     Console.WriteLine("  0. Salir");
     Console.Write("Opción: ");
 
     var opcion = Console.ReadLine()?.Trim();
     if (opcion == "0" || opcion is null) break;
 
-    var elegida = menu.FirstOrDefault(m => m.Clave == opcion);
-    if (elegida.Accion is null) { Consola.Error("Opción no válida."); continue; }
+    if (!int.TryParse(opcion, out var indice) || indice < 1 || indice > categorias.Length)
+    {
+        Consola.Error("Opción no válida.");
+        continue;
+    }
 
-    try { elegida.Accion(); }
-    catch (Exception ex) { Consola.Error($"Excepción no controlada: {ex.GetType().Name}: {ex.Message}"); }
+    var categoria = categorias[indice - 1];
+    while (true)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"----- {categoria.Nombre} -----");
+        foreach (var (clave, texto, _) in categoria.Pruebas)
+            Console.WriteLine($"  {clave}. {texto}");
+        Console.WriteLine("  0. Volver al menú principal");
+        Console.Write("Opción: ");
+
+        var subopcion = Console.ReadLine()?.Trim();
+        if (subopcion == "0" || subopcion is null) break;
+
+        var elegida = categoria.Pruebas.FirstOrDefault(m => m.Clave == subopcion);
+        if (elegida.Accion is null) { Consola.Error("Opción no válida."); continue; }
+
+        try { elegida.Accion(); }
+        catch (Exception ex) { Consola.Error($"Excepción no controlada: {ex.GetType().Name}: {ex.Message}"); }
+    }
 }
 
 HardwareTests.CerrarRecicladora();
