@@ -13,12 +13,18 @@
     "DestinoRechazoDispensa": 1,              // byRejectToAc: 1 = AC1, 2 = AC2, 3 = LRB
     "DestinoRechazoDeposito": 1,              // byRejectPos: 1 = AC1, 2 = AC2, 3 = LRB
     "MaxBilletesPrueba": 5,
-    // Mapa físico según TAC_Logical_Tecnica §2. "Indice" = número RC del SDK, base 1 (RC2 = 2 en la demo).
+    // Mapa físico. "Indice" = número RC del SDK, base 1 (RC2 = 2 en la demo). Orden corregido según observación
+    // física de la gaveta (2026-10-15): al jalarla, el primero en salir es USD 20, luego MXN 100, 200, 500 y
+    // al final el recycler de banda azul. Esto contradice el orden que traía56el TAC_Logical_Tecnica §2 (que
+    // ponía MXN 500 antes de MXN 100) — se prioriza la observación física, PERO sigue sin confirmarse que
+    // "posición en la gaveta" == "número RC del SDK" (es la suposición más razonable, no un hecho verificado
+    // por el SDK). VERIFICAR dispensando 1 billete de cada Indice y que el asistente confirme a simple vista
+    // qué denominación salió (ya lo hace Test_DispensarBilletes al preguntar "¿Cuántos billetes de X ve?").
     "Casetes": [
       { "Indice": 1, "Nombre": "Cassette 1", "Moneda": "USD", "Denominacion": 20 },
-      { "Indice": 2, "Nombre": "Cassette 2", "Moneda": "MXN", "Denominacion": 500 },
+      { "Indice": 2, "Nombre": "Cassette 2", "Moneda": "MXN", "Denominacion": 100 },
       { "Indice": 3, "Nombre": "Cassette 3", "Moneda": "MXN", "Denominacion": 200 },
-      { "Indice": 4, "Nombre": "Cassette 4", "Moneda": "MXN", "Denominacion": 100 }
+      { "Indice": 4, "Nombre": "Cassette 4", "Moneda": "MXN", "Denominacion": 500 }
     ],
     // Se llena con lo observado en Test_AceptarBilletes: código del SDK -> etiqueta. Ej. "12": "USD 20"
     "EtiquetaDenominacion": {}
@@ -27,20 +33,21 @@
     "BaudRate": 9600,
     "MaxMonedasPrueba": 10,
     "Hoppers": [
-      { "Nombre": "MK4 #1 ($1 MXN)", "Denominacion": 1, "Puerto": "COM3", "Direccion": 3 },
-      { "Nombre": "MK4 #2 ($5 MXN)", "Denominacion": 5, "Puerto": "COM3", "Direccion": 4 }
+      { "Nombre": "MK4 #1 ($1 MXN)", "Denominacion": 1, "Puerto": "COM1", "Direccion": 3 },
+      { "Nombre": "MK4 #2 ($5 MXN)", "Denominacion": 5, "Puerto": "COM1", "Direccion": 4 }
     ]
   },
   "Escaner": {
-    "Simulado": true,                        // true hasta tener el SDK MEPR500+ del fabricante
+    "Simulado": false,                       // cambiado a false el 2026-10-16 para probar Test_PingEscaner contra el lector real (el "OK" anterior fue del stub simulado)
     "TimeoutSegundos": 30
   },
   "Impresora": {
-    "Modo": "Spooler",                       // "Spooler" (USB, cola de Windows RAW), "Serial" o "UsbSdk" (SDK del fabricante, canal de producción)
+    "Modo": "Spooler",                       // vuelto a Spooler el 2026-10-17: el SDK (UsbSdk) no se pudo destrabar en esta máquina; logo y tamaños de fuente ahora se arman con ESC/POS crudo (ver EscPos.cs), no dependen del SDK
     "NombreImpresora": "POS80 Printer",       // cola instalada por el driver POS80 (Get-Printer, 2026-10-14)
-    "Puerto": "COM4",
+    "Puerto": "COM4",                        // sin confirmar; solo se usa si Modo="Serial"
     "BaudRate": 115200,
-    "NombreUsb": "POS80"                     // nombre pasado a CP_Port_OpenUsb (modo UsbSdk); sirve cualquier texto si solo hay 1 impresora USB
+    "NombreUsb": "POS80",                    // sin usar mientras Modo no sea "UsbSdk"; el SDK no abría el puerto en esta máquina (ver AutoReplyPrintSdk.Abrir)
+    "RutaLogo": "logo.png"                   // relativa a la carpeta del .exe (se copia junto al build); solo usada por Test_ImprimirVoucherOperacion
   },
   "Sensores": {
     "Puerto": "COM5",
@@ -53,5 +60,18 @@
       "VIBRACION": "",
       "PROXIMIDAD": ""
     }
+  },
+  "Leds": {
+    // Tarjeta aparte del ALB02: "18-Channel LED Light Bar Control Board" (modelo 24002-2). Confirmado en
+    // referencias_integracion/Multifunctional serial control module: 19200 baudios, protocolo DLE/STX/ETX/BCC.
+    "Puerto": "COM2", // confirmado en la máquina real (2026-10-16): firmware "ADK LEDBOX V2.0-20240613"
+    "BaudRate": 19200,
+    "Canales": 18,
+    "PerifericosEsperados": 5 // recibo, moneda, pasaporte, QR, efectivo; la prueba se detiene al identificarlos
+  },
+  "Camara": {
+    // Item 12 del BEEX (GDZS-DC004-MG3021): webcam USB estándar, sin SDK propio.
+    "IndiceDispositivo": 0,
+    "CarpetaCapturas": "Capturas"
   }
 }

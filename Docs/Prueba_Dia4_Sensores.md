@@ -13,6 +13,7 @@ Leer el puerto COM del ALB02 en un bucle reactivo y mostrar `¡PUERTA ABIERTA!` 
 ## Precondiciones
 
 - ALB02 alimentado y conectado al COM; puerto y baudios (9600 por defecto) confirmados con el manual del módulo.
+- **Puerto confirmado en la máquina real (2026-10-16) con `Test_PingSensores`:** `COM5` (el valor por defecto) abre correctamente — a diferencia de monederos y LEDs, aquí el supuesto original resultó ser el correcto.
 - Acceso al gabinete para abrir/cerrar la puerta y golpearlo con cuidado.
 - Cerradura S&G operable (para abrir sin forzar).
 
@@ -112,6 +113,22 @@ public static partial class HardwareTests
         ["PROXIMIDAD"] = "Proximidad detectada",
     };
 
+    // El ALB02 es reactivo (solo manda tramas cuando algo lo dispara): no hay comando de consulta
+    // documentado, así que lo máximo que se puede confirmar sin manipular el gabinete es que el puerto abre.
+    public static void Test_PingSensores()
+    {
+        var r = new Reporte($"Sensores ALB02 - Ping ({Sensores.Puerto} @ {Sensores.BaudRate})");
+        try
+        {
+            using var puerto = new SerialPort(Sensores.Puerto, Sensores.BaudRate, Parity.None, 8, StopBits.One)
+                { DtrEnable = true, RtsEnable = true }; // ver CcTalk.cs: algunos adaptadores los necesitan para habilitarse
+            puerto.Open();
+            r.Criterio($"Apertura de {Sensores.Puerto} @ {Sensores.BaudRate}", puerto.IsOpen);
+        }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
     public static void Test_EscucharSensores()
     {
         var patrones = Sensores.Tramas
@@ -124,7 +141,8 @@ public static partial class HardwareTests
             Consola.Aviso("Sin tramas configuradas: solo se mostrarán las tramas crudas. Use Test_CalibrarSensores.");
         Consola.Info("Manipule la puerta / golpee el gabinete. Presione Q para terminar.");
 
-        using var puerto = new SerialPort(Sensores.Puerto, Sensores.BaudRate, Parity.None, 8, StopBits.One);
+        using var puerto = new SerialPort(Sensores.Puerto, Sensores.BaudRate, Parity.None, 8, StopBits.One)
+            { DtrEnable = true, RtsEnable = true };
         puerto.Open();
 
         byte[]? anterior = null;
@@ -148,7 +166,8 @@ public static partial class HardwareTests
     public static void Test_CalibrarSensores()
     {
         Consola.Titulo($"Sensores ALB02 - Calibración en {Sensores.Puerto} @ {Sensores.BaudRate}");
-        using var puerto = new SerialPort(Sensores.Puerto, Sensores.BaudRate, Parity.None, 8, StopBits.One);
+        using var puerto = new SerialPort(Sensores.Puerto, Sensores.BaudRate, Parity.None, 8, StopBits.One)
+            { DtrEnable = true, RtsEnable = true };
         puerto.Open();
 
         var pasos = new (string Evento, string Instruccion)[]
@@ -187,9 +206,11 @@ public static partial class HardwareTests
 ## Cómo ejecutar
 
 1. Menú `7` (calibración): seguir las instrucciones de reposo, puerta abierta, puerta cerrada y vibración; copiar las tramas a `hardware.json`.
-2. Menú `8` (escucha): manipular el gabinete; `Q` termina. Equivalente desde `Main`:
+2. Menú `8` (escucha): manipular el gabinete; `Q` termina.
+3. Menú `16` (ping: solo abre el puerto COM; el ALB02 es reactivo, no hay comando de consulta que responder). Equivalente desde `Main`:
 
 ```csharp
+HardwareTests.Test_PingSensores();
 HardwareTests.Test_CalibrarSensores();
 HardwareTests.Test_EscucharSensores();
 ```

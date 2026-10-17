@@ -19,6 +19,22 @@ public static partial class HardwareTests
         ["PROXIMIDAD"] = "Proximidad detectada",
     };
 
+    // El ALB02 es reactivo (solo manda tramas cuando algo lo dispara): no hay comando de consulta
+    // documentado, así que lo máximo que se puede confirmar sin manipular el gabinete es que el puerto abre.
+    public static void Test_PingSensores()
+    {
+        var r = new Reporte($"Sensores ALB02 - Ping ({Sensores.Puerto} @ {Sensores.BaudRate})");
+        try
+        {
+            using var puerto = new SerialPort(Sensores.Puerto, Sensores.BaudRate, Parity.None, 8, StopBits.One)
+                { DtrEnable = true, RtsEnable = true }; // ver CcTalk.cs: algunos adaptadores los necesitan para habilitarse
+            puerto.Open();
+            r.Criterio($"Apertura de {Sensores.Puerto} @ {Sensores.BaudRate}", puerto.IsOpen);
+        }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
     public static void Test_EscucharSensores()
     {
         var patrones = Sensores.Tramas
@@ -31,7 +47,8 @@ public static partial class HardwareTests
             Consola.Aviso("Sin tramas configuradas: solo se mostrarán las tramas crudas. Use Test_CalibrarSensores.");
         Consola.Info("Manipule la puerta / golpee el gabinete. Presione Q para terminar.");
 
-        using var puerto = new SerialPort(Sensores.Puerto, Sensores.BaudRate, Parity.None, 8, StopBits.One);
+        using var puerto = new SerialPort(Sensores.Puerto, Sensores.BaudRate, Parity.None, 8, StopBits.One)
+            { DtrEnable = true, RtsEnable = true };
         puerto.Open();
 
         byte[]? anterior = null;
@@ -55,7 +72,8 @@ public static partial class HardwareTests
     public static void Test_CalibrarSensores()
     {
         Consola.Titulo($"Sensores ALB02 - Calibración en {Sensores.Puerto} @ {Sensores.BaudRate}");
-        using var puerto = new SerialPort(Sensores.Puerto, Sensores.BaudRate, Parity.None, 8, StopBits.One);
+        using var puerto = new SerialPort(Sensores.Puerto, Sensores.BaudRate, Parity.None, 8, StopBits.One)
+            { DtrEnable = true, RtsEnable = true };
         puerto.Open();
 
         var pasos = new (string Evento, string Instruccion)[]

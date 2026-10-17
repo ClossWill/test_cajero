@@ -12,10 +12,29 @@
 | 2 | Monederos MK4 (x2) | ccTalk sobre COM | `Test_PingMonederos`, `Test_DispensarMonedas` | [Prueba_Dia2_Monederos.md](Prueba_Dia2_Monederos.md) |
 | 3 | Impresora KP-80A | ESC/POS (spooler USB o COM) + SDK nativo (USB autoreply, canal de producción) | `Test_ImprimirVoucherPrueba` | [Prueba_Dia3_Impresora.md](Prueba_Dia3_Impresora.md) |
 | 4 | Módulo ALB02 (sensores) | Serial reactivo (COM) | `Test_CalibrarSensores`, `Test_EscucharSensores` | [Prueba_Dia4_Sensores.md](Prueba_Dia4_Sensores.md) |
-| 5 | Escáner MEPR500+ | SDK propietario | `Test_EscanearDocumento` | [Prueba_Dia5_Escaner.md](Prueba_Dia5_Escaner.md) |
-| 6 | Cierre y regresión | – | Todos, en secuencia | sección 5 |
+| 5 | Escáner MEPR500+ | SDK propietario (`TWRPassportAPI.dll`, modo automático por callback) | `Test_EscanearDocumento` | [Prueba_Dia5_Escaner.md](Prueba_Dia5_Escaner.md) |
+| 6 | Tarjeta de LEDs 24002-2 (indicadores) | RS232 propio, `DLE/STX/ETX/BCC` (no es el ALB02) | `Test_ControlarLeds` | [Prueba_Dia6_Leds.md](Prueba_Dia6_Leds.md) |
+| 7 | Cámara USB (item 12 BEEX, reconocimiento facial) | OpenCvSharp (`VideoCapture`) | `Test_CapturarRostro` | [Prueba_Dia7_Camara.md](Prueba_Dia7_Camara.md) |
+| 8 | Cierre y regresión | – | Todos, en secuencia | sección 5 |
 
-Orden por dependencias: la recicladora es el componente más crítico y el de más riesgo, por eso va primero. La impresora va antes que sensores y escáner porque sirve para imprimir la evidencia del resto. El escáner queda al final porque depende de recibir el SDK del fabricante.
+Orden por dependencias: la recicladora es el componente más crítico y el de más riesgo, por eso va primero. La impresora va antes que sensores y escáner porque sirve para imprimir la evidencia del resto. El escáner queda al final porque depende de recibir el SDK del fabricante. Los LEDs y la cámara se agregaron después, fuera del alcance original de 5 periféricos (ver notas en [Prueba_Dia6_Leds.md](Prueba_Dia6_Leds.md) y [Prueba_Dia7_Camara.md](Prueba_Dia7_Camara.md)); van al final porque no bloquean a ninguno de los otros. El item 11 del BEEX (NVR Hikvision) no tiene prueba: el propio documento dice que no requiere que el Agente lo gestione.
+
+### 1.1 Orden de ejecución real: todo en una sola visita
+
+Los nombres de archivo (`Prueba_DiaN_*.md`) y la columna "Día" del cronograma se dejan como están, pero **en la práctica las ocho pruebas se corren en una sola jornada**, con el desarrollador y el asistente ya coordinados para toda la sesión. "Día N" es solo el identificador histórico de cada documento, no literalmente un día distinto. El orden dentro de esa sesión sigue la misma secuencia del cronograma (por las dependencias ya explicadas):
+
+| # | Bloque | Opciones de menú | Requiere asistente/billetes físicos |
+| :-- | :-- | :-- | :-- |
+| 1 | Recicladora | `1` → (`11` si hace falta reinicio) → `2` → `10` → `3` (y `20`/`21` si hay que diagnosticar el shutter aparte) | Sí |
+| 2 | Monederos | `4` → `5` | Sí |
+| 3 | Impresora | `6` | No (solo revisar el voucher impreso) |
+| 4 | Sensores (ALB02) | `7` → `8` | Sí (manipular puerta/gabinete) |
+| 5 | Escáner | `9` | Sí (colocar un documento) |
+| 6 | LEDs | `12` | No |
+| 7 | Cámara | `13` | No |
+| 8 | Cierre | repetir ciclos clave (ver sección 5) | Sí |
+
+No hace falta reiniciar el programa entre bloques — `HardwareTests` mantiene el handle de la recicladora abierto (`_crm`) durante toda la sesión y solo se cierra al salir del menú (`CerrarRecicladora()` en `Program.cs`). Si un bloque falla, se puede saltar al siguiente sin perder lo ya aprobado: cada `Test_*` imprime su propio `APROBADO`/`RECHAZADO` independiente en la misma bitácora.
 
 ## 2. Día 0 – Preparación del entorno
 
@@ -35,7 +54,7 @@ hardware.json              puertos COM, direcciones y supuestos (se edita en la 
 CRM9250N.cs                fuente nativa del fabricante (sin modificar)
 Config/HardwareConfig.cs   carga de hardware.json
 Helpers/                   Consola (salida), Reporte (criterios), Native (marshaling)
-Protocolos/                CcTalk, EscPos + ImpresoraRaw, AutoReplyPrintSdk, SerialTramas
+Protocolos/                CcTalk, EscPos + ImpresoraRaw, AutoReplyPrintSdk, TwrPassportSdk, LedControlSerial, SerialTramas
 Tests/                     una clase parcial HardwareTests por periférico
 Docs/                      estos documentos
 ```
@@ -66,17 +85,25 @@ var menu = new (string Clave, string Texto, Action Accion)[]
     ("1", "Recicladora  - Inicializar (conecta, sin movimiento)", () => HardwareTests.Test_InicializarRecicladora()),
     ("11", "Recicladora - Reinicio mecánico (iPowerOnInitEx, SE MUEVE)", () => HardwareTests.Test_InicializarRecicladora(reinicioMecanico: true)),
     ("2", "Recicladora  - Aceptar billetes",         () => HardwareTests.Test_AceptarBilletes()),
-    ("3", "Recicladora  - Dispensar billetes",       () => HardwareTests.Test_DispensarBilletes(
-                                                         PedirEntero("Cantidad de billetes", 1), PedirTexto("Moneda (MXN/USD)", "MXN"),
-                                                         PedirEntero("Denominación (500/200/100 MXN, 20 USD)", 100))),
+    ("3", "Recicladora  - Dispensar billetes",       () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa())),
     ("10", "Recicladora - Billete inválido (espera rechazo)", () => HardwareTests.Test_AceptarBilletes(esperaRechazo: true)),
+    ("20", "Recicladora - Abrir shutter (control manual)",    HardwareTests.Test_AbrirShutter),
+    ("21", "Recicladora - Cerrar shutter (control manual)",   HardwareTests.Test_CerrarShutter),
     ("4", "Monederos    - Ping ccTalk",              HardwareTests.Test_PingMonederos),
     ("5", "Monederos    - Dispensar monedas",        () => HardwareTests.Test_DispensarMonedas(
                                                          PedirEntero("Monedas de $1", 2), PedirEntero("Monedas de $5", 1))),
     ("6", "Impresora    - Voucher de prueba",        HardwareTests.Test_ImprimirVoucherPrueba),
+    ("14", "Impresora   - Voucher de operación (logo + formato tradicional)", HardwareTests.Test_ImprimirVoucherOperacion),
+    ("15", "Impresora   - Ping (conexión, sin imprimir)", HardwareTests.Test_PingImpresora),
     ("7", "Sensores     - Calibrar tramas ALB02",    HardwareTests.Test_CalibrarSensores),
     ("8", "Sensores     - Escuchar (puerta/vibración)", HardwareTests.Test_EscucharSensores),
+    ("16", "Sensores    - Ping (abre el puerto COM)", HardwareTests.Test_PingSensores),
     ("9", "Escáner      - Leer documento",           HardwareTests.Test_EscanearDocumento),
+    ("17", "Escáner     - Ping (inicializa SDK, sin leer)", HardwareTests.Test_PingEscaner),
+    ("12", "LEDs        - Control de indicadores (18 canales)", HardwareTests.Test_ControlarLeds),
+    ("18", "LEDs        - Ping (firmware)",          HardwareTests.Test_PingLeds),
+    ("13", "Cámara      - Capturar foto (item 12 BEEX)",         HardwareTests.Test_CapturarRostro),
+    ("19", "Cámara      - Ping (abre el dispositivo)", HardwareTests.Test_PingCamara),
 };
 
 while (true)
@@ -115,6 +142,21 @@ static string PedirTexto(string pregunta, string porDefecto)
     Console.Write($"{pregunta} [{porDefecto}]: ");
     var t = Console.ReadLine()?.Trim();
     return string.IsNullOrEmpty(t) ? porDefecto : t;
+}
+
+// Arma una orden de dispensa de uno o varios casetes (ej. 500+200+100 MXN juntos) antes de mandarla como una
+// sola llamada atómica a iDispenseEx.
+static (string Moneda, int Denominacion, int Cantidad)[] PedirPedidoDispensa()
+{
+    var pedido = new List<(string Moneda, int Denominacion, int Cantidad)>();
+    do
+    {
+        var moneda = PedirTexto("Moneda (MXN/USD)", "MXN");
+        var denominacion = PedirEntero("Denominación (500/200/100 MXN, 20 USD)", 100);
+        var cantidad = PedirEntero("Cantidad de billetes de esa denominación", 1);
+        pedido.Add((moneda, denominacion, cantidad));
+    } while (Consola.Confirmar("¿Agregar otra denominación a la misma orden?"));
+    return pedido.ToArray();
 }
 ```
 
@@ -409,12 +451,18 @@ public sealed class NativeScope : IDisposable
     "DestinoRechazoDispensa": 1,              // byRejectToAc: 1 = AC1, 2 = AC2, 3 = LRB
     "DestinoRechazoDeposito": 1,              // byRejectPos: 1 = AC1, 2 = AC2, 3 = LRB
     "MaxBilletesPrueba": 5,
-    // Mapa físico según TAC_Logical_Tecnica §2. "Indice" = número RC del SDK, base 1 (RC2 = 2 en la demo).
+    // Mapa físico. "Indice" = número RC del SDK, base 1 (RC2 = 2 en la demo). Orden corregido según observación
+    // física de la gaveta (2026-10-15): al jalarla, el primero en salir es USD 20, luego MXN 100, 200, 500 y
+    // al final el recycler de banda azul. Esto contradice el orden que traía56el TAC_Logical_Tecnica §2 (que
+    // ponía MXN 500 antes de MXN 100) — se prioriza la observación física, PERO sigue sin confirmarse que
+    // "posición en la gaveta" == "número RC del SDK" (es la suposición más razonable, no un hecho verificado
+    // por el SDK). VERIFICAR dispensando 1 billete de cada Indice y que el asistente confirme a simple vista
+    // qué denominación salió (ya lo hace Test_DispensarBilletes al preguntar "¿Cuántos billetes de X ve?").
     "Casetes": [
       { "Indice": 1, "Nombre": "Cassette 1", "Moneda": "USD", "Denominacion": 20 },
-      { "Indice": 2, "Nombre": "Cassette 2", "Moneda": "MXN", "Denominacion": 500 },
+      { "Indice": 2, "Nombre": "Cassette 2", "Moneda": "MXN", "Denominacion": 100 },
       { "Indice": 3, "Nombre": "Cassette 3", "Moneda": "MXN", "Denominacion": 200 },
-      { "Indice": 4, "Nombre": "Cassette 4", "Moneda": "MXN", "Denominacion": 100 }
+      { "Indice": 4, "Nombre": "Cassette 4", "Moneda": "MXN", "Denominacion": 500 }
     ],
     // Se llena con lo observado en Test_AceptarBilletes: código del SDK -> etiqueta. Ej. "12": "USD 20"
     "EtiquetaDenominacion": {}
@@ -423,20 +471,21 @@ public sealed class NativeScope : IDisposable
     "BaudRate": 9600,
     "MaxMonedasPrueba": 10,
     "Hoppers": [
-      { "Nombre": "MK4 #1 ($1 MXN)", "Denominacion": 1, "Puerto": "COM3", "Direccion": 3 },
-      { "Nombre": "MK4 #2 ($5 MXN)", "Denominacion": 5, "Puerto": "COM3", "Direccion": 4 }
+      { "Nombre": "MK4 #1 ($1 MXN)", "Denominacion": 1, "Puerto": "COM1", "Direccion": 3 },
+      { "Nombre": "MK4 #2 ($5 MXN)", "Denominacion": 5, "Puerto": "COM1", "Direccion": 4 }
     ]
   },
   "Escaner": {
-    "Simulado": true,                        // true hasta tener el SDK MEPR500+ del fabricante
+    "Simulado": false,                       // cambiado a false el 2026-10-16 para probar Test_PingEscaner contra el lector real (el "OK" anterior fue del stub simulado)
     "TimeoutSegundos": 30
   },
   "Impresora": {
-    "Modo": "Spooler",                       // "Spooler" (USB, cola de Windows RAW), "Serial" o "UsbSdk" (SDK del fabricante, canal de producción)
+    "Modo": "Spooler",                       // vuelto a Spooler el 2026-10-17: el SDK (UsbSdk) no se pudo destrabar en esta máquina; logo y tamaños de fuente ahora se arman con ESC/POS crudo (ver EscPos.cs), no dependen del SDK
     "NombreImpresora": "POS80 Printer",       // cola instalada por el driver POS80 (Get-Printer, 2026-10-14)
-    "Puerto": "COM4",
+    "Puerto": "COM4",                        // sin confirmar; solo se usa si Modo="Serial"
     "BaudRate": 115200,
-    "NombreUsb": "POS80"                     // nombre pasado a CP_Port_OpenUsb (modo UsbSdk); sirve cualquier texto si solo hay 1 impresora USB
+    "NombreUsb": "POS80",                    // sin usar mientras Modo no sea "UsbSdk"; el SDK no abría el puerto en esta máquina (ver AutoReplyPrintSdk.Abrir)
+    "RutaLogo": "logo.png"                   // relativa a la carpeta del .exe (se copia junto al build); solo usada por Test_ImprimirVoucherOperacion
   },
   "Sensores": {
     "Puerto": "COM5",
@@ -449,6 +498,19 @@ public sealed class NativeScope : IDisposable
       "VIBRACION": "",
       "PROXIMIDAD": ""
     }
+  },
+  "Leds": {
+    // Tarjeta aparte del ALB02: "18-Channel LED Light Bar Control Board" (modelo 24002-2). Confirmado en
+    // referencias_integracion/Multifunctional serial control module: 19200 baudios, protocolo DLE/STX/ETX/BCC.
+    "Puerto": "COM2", // confirmado en la máquina real (2026-10-16): firmware "ADK LEDBOX V2.0-20240613"
+    "BaudRate": 19200,
+    "Canales": 18,
+    "PerifericosEsperados": 5 // recibo, moneda, pasaporte, QR, efectivo; la prueba se detiene al identificarlos
+  },
+  "Camara": {
+    // Item 12 del BEEX (GDZS-DC004-MG3021): webcam USB estándar, sin SDK propio.
+    "IndiceDispositivo": 0,
+    "CarpetaCapturas": "Capturas"
   }
 }
 ```
@@ -457,7 +519,7 @@ public sealed class NativeScope : IDisposable
 
 **Confirmado por `Finso_TAC_Logical_Tecnica.pdf` y `Finso_Guia_Integracion_Hardware BEEX.pdf`:**
 
-- Mapa físico: Cassette 1 = USD 20, Cassette 2 = MXN 500, Cassette 3 = MXN 200, Cassette 4 = MXN 100; Monedero 1 = MXN 1, Monedero 2 = MXN 5; el resto de billetes válidos va al recycler. Está en `hardware.json` (`Casetes`, `Hoppers`).
+- Mapa físico (orden corregido por observación de la gaveta, no por el TAC — ver supuesto #2): Cassette 1 = USD 20, Cassette 2 = MXN 100, Cassette 3 = MXN 200, Cassette 4 = MXN 500, y el recycler de banda azul al final; Monedero 1 = MXN 1, Monedero 2 = MXN 5; el resto de billetes válidos va al recycler. Está en `hardware.json` (`Casetes`, `Hoppers`).
 - Escenarios de prueba que el TAC exige: billete inválido rechazado, billete válido no dispensable al recycler, monedero $1 agotado y dispensa parcial. Quedaron incorporados como criterios en los días 1 y 2.
 - Regla del TAC: una orden de dispensa no equivale a entrega física. Por eso cada prueba imprime contadores y pide confirmación humana.
 - Para el ALB02, el BEEX confirma que envía cadenas de bytes por COM y que importa el **cambio de estado**, que es lo que hace la escucha (ignora repeticiones idénticas).
@@ -469,7 +531,7 @@ public sealed class NativeScope : IDisposable
 | Carpeta de GRG (demo WinForm y guía del SDK `CRM9250N`) | Puntos 1 y 2 |
 | Tablas de Excel de ccTalk de la carpeta de integración | Puntos 3 y 4 |
 | Documentación del ALB02 | Punto 5 |
-| SDK y manual del MEPR500+ | Punto 6 |
+| ~~SDK y manual del MEPR500+~~ **Recibido:** `MEPR500 Windows SDK 20230815` (DLL, demos C#/VC++, header, manuales) | Punto 6 |
 
 **Discrepancia por aclarar:** el BEEX llama a los 4 casetes "de aceptación"; el TAC los usa como casetes de dispensa. El TAC §15 deja como decisión pendiente con el proveedor qué denominaciones se aceptan y cuáles se reciclan o dispensan.
 
@@ -478,23 +540,26 @@ public sealed class NativeScope : IDisposable
 | # | Supuesto | Dónde | Cómo validarlo |
 | :-- | :-- | :-- | :-- |
 | 1 | ~~Nombre lógico y código de éxito~~ **Confirmado:** `CRM9250NDev`, `rc == 0` (demo y PDF de GRG) | `Recicladora.*` | – |
-| 2 | ~~`byDispType` e `Indice` de casete~~ **Confirmado:** `1` = por casete; RC1..RC4 = 1..4 | `TipoDispensa`, `Casetes[].Indice` | Probar con 1 billete por casete |
+| 2 | ~~`byDispType`~~ **Confirmado:** `1` = por casete, RC1..RC4 = 1..4. **Orden de denominación por Indice corregido** por observación de la gaveta (ya no es el del TAC) | `TipoDispensa`, `Casetes[].Indice` | Probar con 1 billete por casete y que el asistente confirme a simple vista qué denominación salió |
 | 3 | ~~Dispense de hopper~~ **Confirmado (doc. MK4):** 8 bytes en 0 + cantidad, sin cifrado; responde con contador de eventos | `Monederos.cs` | Probar con 1 moneda |
 | 4 | Direcciones ccTalk de los hoppers (3 y 4) | `Monederos.Hoppers` | Si no responden, hacer barrido de direcciones 1–10 |
 | 5 | Formato de tramas del ALB02 | `Sensores.Tramas` | `Test_CalibrarSensores` |
-| 6 | API del SDK del MEPR500+ | `EscanerMeprSdk` | Documentación y DLL del fabricante |
+| 6 | ~~API del SDK del MEPR500+~~ **Confirmado (TWRPassportAPI.h + demo del fabricante):** `TW_Initialize`/`TW_SetCapture_Start`/`TW_SetAutoModel(true)` + callback `TW_Capture_RegisterCallbackResultImageEX`; implementado en `TwrPassportSdk.cs`, sin probar en el lector real | `EscanerMeprSdk` | `Test_EscanearDocumento` con `Escaner.Simulado: false` |
 | 7 | ~~Bits de la DLL~~ **Confirmado:** x86. Falta `DevBaseDll.dll` en el zip del SDK | `.csproj` | El pre-vuelo del menú 1 lo detecta |
 | 8 | ~~Nombre de la cola de la impresora~~ **Confirmado:** `POS80 Printer` (driver POS80), no "KP-80A" | `Impresora.NombreImpresora` | `Get-Printer` |
 | 9 | Modo `UsbSdk` de la impresora (canal recomendado para producción) sin probar en hardware real | `AutoReplyPrintSdk.cs` | `Test_ImprimirVoucherPrueba` con `Modo: "UsbSdk"` |
+| 10 | Lectura de chip RFID (ICAO 9303) del MEPR500+ no implementada; solo queda el camino OCR/MRZ | `TwrPassportSdk.cs` | Investigar `TW_InitIDCard`, `TW_Capture_SetFunctions`, `TW_Capture_GetDGData` |
+| 11 | Tarjeta de LEDs (24002-2): protocolo confirmado contra ~40 ejemplos del fabricante, sin probar en la tarjeta real; puerto COM sin confirmar | `LedControlSerial.cs` | `Test_ControlarLeds` |
+| 12 | Cámara USB (item 12 BEEX): backend de captura e índice de dispositivo sin confirmar en la máquina real | `Tests/Camara.cs`, `Camara.IndiceDispositivo` | `Test_CapturarRostro` |
 
 ## 4. Convenciones de evidencia
 
 Para cada prueba guardar en `Evidencia/DiaN/`: la bitácora de la sesión (`bitacoras\sesion_*.txt`) con el resultado `APROBADO`/`RECHAZADO`, foto o video corto del comportamiento físico y, en la impresora, el voucher físico. Las tramas crudas (ccTalk, ALB02) se pegan tal como aparecen en consola.
 
-## 5. Día 6 – Cierre y regresión
+## 5. Día 8 – Cierre y regresión
 
-1. Ejecutar las 9 opciones del menú en secuencia, sin reiniciar el programa; confirmar que no quedan puertos bloqueados entre pruebas.
+1. Ejecutar todas las opciones del menú en secuencia, sin reiniciar el programa; confirmar que no quedan puertos bloqueados entre pruebas.
 2. Repetir 3 ciclos de aceptar/dispensar billetes y 3 de dispensar monedas.
 3. Confirmar `hardware.json` final con los valores reales de la máquina.
 4. Consolidar la lista de **métodos validados** para extraerlos a la aplicación oficial y la lista de **supuestos que resultaron falsos**.
-5. Firmar el cierre solo si todos los criterios de los documentos de los días 1–5 están en `APROBADO`; el escáner no puede cerrarse mientras use el modo simulado.
+5. Firmar el cierre solo si todos los criterios de los documentos de los días 1–7 están en `APROBADO`; el escáner no puede cerrarse mientras use el modo simulado.

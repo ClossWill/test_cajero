@@ -38,6 +38,12 @@ public sealed class CcTalkBus : IDisposable
         {
             ReadTimeout = 500,
             WriteTimeout = 500,
+            // Confirmado en la máquina real (2026-10-16): sin esto, Simple Poll no obtenía respuesta en
+            // ningún puerto probado (COM3, COM13, COM14), aunque el puerto abría sin error. El adaptador
+            // RS232<->ccTalk de esta máquina alimenta o habilita su transceptor desde DTR/RTS, que .NET deja
+            // en false por defecto. Con esto activado + el puerto real (COM1, no COM3), Simple Poll respondió.
+            DtrEnable = true,
+            RtsEnable = true,
         };
         _puerto.Open();
     }

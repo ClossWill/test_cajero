@@ -22,6 +22,12 @@ public static class AutoReplyPrintSdk
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
     private static extern IntPtr CP_Port_OpenUsb(string name, int autoreplymode);
 
+    // CP_ComDataBits_8=8, CP_ComParity_NoParity=0, CP_ComStopBits_One=0, CP_ComFlowControl_None=0 (valores
+    // del enum en autoreplyprint.h): mismo 8N1 sin control de flujo que ya usa el modo "Serial" (EnviarPorSerial).
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern IntPtr CP_Port_OpenCom(string name, uint baudrate, int databits, int parity, int stopbits,
+        int flowcontrol, int autoreplymode);
+
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern int CP_Port_Close(IntPtr handle);
 
@@ -49,14 +55,55 @@ public static class AutoReplyPrintSdk
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern int CP_Pos_QueryPrintResult(IntPtr handle, uint timeout);
 
+    // Logo/tamaño de fuente (autoreplyprint.h §"print image"/"set text scale"): el .h no aclara si
+    // dstw/dsth=0 conserva el tamaño original, así que ImprimirImagen siempre pide ambos en puntos (dots).
+    // nWidthScale/nHeightScale tampoco traen rango documentado; se asume 0-7 (x1 a x8), el mismo patrón
+    // que ESC/POS GS ! estándar — pendiente de confirmar con una impresión física real.
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    private static extern int CP_Pos_PrintRasterImageFromFile(IntPtr handle, int dstw, int dsth, string pszFile,
+        int binaryzationMethod, int compressionMethod);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Pos_SetTextScale(IntPtr handle, int nWidthScale, int nHeightScale);
+
     public const int AlineacionIzquierda = 0;
     public const int AlineacionCentro = 1;
     public const int AlineacionDerecha = 2;
 
-    /// <summary>Abre el puerto USB en modo autoreply (la impresora reporta su estado sin que se le pregunte).
+    // CP_ImageBinarizationMethod.
+    public const int BinarizacionDithering = 0;
+    public const int BinarizacionUmbral = 1;
+    public const int BinarizacionDifusionError = 2;
+
+    // CP_ImageCompressionMethod.
+    public const int SinCompresion = 0;
+
+    /// <summary>Abre el puerto USB (interfaz "USB Printing Support") en modo autoreply.
     /// <paramref name="nombre"/> puede ser cualquier texto si solo hay una impresora USB conectada
-    /// (así lo documenta el SDK); null/handle inválido si no la encuentra.</summary>
+    /// (así lo documenta el SDK); null/handle inválido si no la encuentra.
+    /// En la máquina real (2026-10-16/17) este Open falla con el SDK aunque detecta un dispositivo USB (log
+    /// propio de la DLL, VID 0x0FE6/PID 0x811E), con y sin spooler de Windows corriendo, con y sin privilegios
+    /// de administrador — pero Windows SÍ ve esta impresora como USB Printing Support genuino (Propiedades >
+    /// Puertos de "POS80 Printer" muestra `CP001`, tipo `USBPort`). Se sospecha que el controlador de Windows
+    /// retiene el puerto mientras la cola esté instalada; pendiente de confirmar quitando la cola temporalmente.
+    /// <see cref="AbrirCom"/> (por COM13/14, el puente CP210x del mismo cable USB) también falló en los
+    /// intentos iniciales, antes de este cambio de rumbo — ver Docs/Prueba_Dia3_Impresora.md.</summary>
     public static IntPtr Abrir(string nombre) => CP_Port_OpenUsb(nombre, autoreplymode: 1);
+
+    /// <summary>Abre el puerto serie (virtual, sobre el mismo USB) en modo autoreply: misma SDK, mismo
+    /// protocolo "autoreply" que <see cref="Abrir"/>, pero por <c>CP_Port_OpenCom</c> en vez de
+    /// <c>CP_Port_OpenUsb</c>. Alternativa sin confirmar aún como la ruta correcta para esta impresora
+    /// (ver comentario de <see cref="Abrir"/>); se deja implementada por si <see cref="Abrir"/> no se
+    /// puede destrabar.</summary>
+    public static IntPtr AbrirCom(string puerto, uint baudios)
+    {
+        // Para COM10 en adelante, CreateFile (lo que CP_Port_OpenCom hace internamente) exige el prefijo
+        // "\\.\": "COM14" a secas falla silenciosamente aunque el puerto exista y esté libre (clásico de
+        // Win32, no documentado en autoreplyprint.h). COM1-COM9 funcionan con o sin el prefijo, así que es
+        // seguro agregarlo siempre.
+        var nombre = puerto.StartsWith(@"\\.\", StringComparison.Ordinal) ? puerto : @"\\.\" + puerto;
+        return CP_Port_OpenCom(nombre, baudios, databits: 8, parity: 0, stopbits: 0, flowcontrol: 0, autoreplymode: 1);
+    }
 
     public static bool EsValido(IntPtr handle) => handle != IntPtr.Zero;
 
@@ -66,6 +113,15 @@ public static class AutoReplyPrintSdk
     }
 
     public static bool Reset(IntPtr handle) => CP_Pos_ResetPrinter(handle) != 0;
+
+    /// <summary>Imprime una imagen (p.ej. el logo) desde un archivo. <paramref name="anchoDots"/>/<paramref name="altoDots"/>
+    /// son el tamaño destino en puntos de impresión, no en píxeles del archivo.</summary>
+    public static bool ImprimirImagen(IntPtr handle, string rutaArchivo, int anchoDots, int altoDots) =>
+        CP_Pos_PrintRasterImageFromFile(handle, anchoDots, altoDots, rutaArchivo, BinarizacionDithering, SinCompresion) != 0;
+
+    /// <summary>Escala del texto siguiente (ancho, alto); 0 = tamaño normal. Ver nota de rango arriba.</summary>
+    public static bool EscalaTexto(IntPtr handle, int escalaAncho, int escalaAlto) =>
+        CP_Pos_SetTextScale(handle, escalaAncho, escalaAlto) != 0;
     public static bool Alinear(IntPtr handle, int alineacion) => CP_Pos_SetAlignment(handle, alineacion) != 0;
     public static bool Negrita(IntPtr handle, bool activa) => CP_Pos_SetTextBold(handle, activa ? 1 : 0) != 0;
     public static bool Texto(IntPtr handle, string texto) => CP_Pos_PrintText(handle, texto) != 0;

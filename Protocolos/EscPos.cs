@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using OpenCvSharp;
 
 namespace IntegracionCajeroPruebas.Protocolos;
 
@@ -21,6 +22,44 @@ public static class EscPos
 
     /// <summary>Respuesta a DLE EOT 1: bit 3 en 1 = fuera de línea.</summary>
     public static bool EstaEnLinea(byte estado) => (estado & 0x08) == 0;
+
+    /// <summary>GS ! n (select character size): escala 0-7 (x1 a x8) de ancho y alto para el texto siguiente.
+    /// EscalaTexto(0, 0) vuelve al tamaño normal. Estándar ESC/POS, no exclusivo del SDK del fabricante.</summary>
+    public static byte[] EscalaTexto(int escalaAncho, int escalaAlto) =>
+        new byte[] { 0x1D, 0x21, (byte)(((escalaAncho & 0x07) << 4) | (escalaAlto & 0x07)) };
+
+    /// <summary>GS v 0 (print raster bit image): arma el comando a partir de bits ya empaquetados a 1bpp
+    /// (ver <see cref="ImagenDesdeArchivo"/>). Estándar ESC/POS, no exclusivo del SDK del fabricante.</summary>
+    public static byte[] ImagenRaster(byte[] datosEmpaquetados, int anchoDots, int altoDots)
+    {
+        var xBytes = (anchoDots + 7) / 8;
+        var encabezado = new byte[]
+        {
+            0x1D, 0x76, 0x30, 0x00, // GS v 0, m=0 (normal)
+            (byte)(xBytes & 0xFF), (byte)((xBytes >> 8) & 0xFF),
+            (byte)(altoDots & 0xFF), (byte)((altoDots >> 8) & 0xFF),
+        };
+        return Concatenar(encabezado, datosEmpaquetados);
+    }
+
+    /// <summary>Carga una imagen (cualquier formato que lea OpenCV), la escala a anchoDots x altoDots y la
+    /// convierte a 1bpp empaquetado (bit=1 → imprime negro) con umbral simple, listo para <see cref="ImagenRaster"/>.</summary>
+    public static byte[] ImagenDesdeArchivo(string ruta, int anchoDots, int altoDots)
+    {
+        using var gris = Cv2.ImRead(ruta, ImreadModes.Grayscale);
+        using var escalada = new Mat();
+        Cv2.Resize(gris, escalada, new Size(anchoDots, altoDots));
+        using var binaria = new Mat();
+        Cv2.Threshold(escalada, binaria, 128, 255, ThresholdTypes.BinaryInv); // oscuro del logo -> bit en 1
+
+        var xBytes = (anchoDots + 7) / 8;
+        var datos = new byte[xBytes * altoDots];
+        for (var y = 0; y < altoDots; y++)
+            for (var x = 0; x < anchoDots; x++)
+                if (binaria.At<byte>(y, x) != 0)
+                    datos[y * xBytes + x / 8] |= (byte)(0x80 >> (x % 8));
+        return datos;
+    }
 }
 
 /// <summary>Envía bytes crudos a una impresora instalada en Windows (USB) a través del spooler, sin driver gráfico.</summary>
@@ -54,6 +93,14 @@ public static class ImpresoraRaw
 
     [DllImport("winspool.Drv", SetLastError = true)]
     private static extern bool WritePrinter(IntPtr h, IntPtr datos, int cantidad, out int escritos);
+
+    /// <summary>Abre y cierra la cola sin imprimir nada: confirma que existe y responde, para el ping.</summary>
+    public static bool Existe(string nombreImpresora)
+    {
+        if (!OpenPrinter(nombreImpresora, out var h, IntPtr.Zero)) return false;
+        ClosePrinter(h);
+        return true;
+    }
 
     public static void Enviar(string nombreImpresora, byte[] bytes)
     {

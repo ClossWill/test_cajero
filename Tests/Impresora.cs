@@ -10,6 +10,61 @@ namespace IntegracionCajeroPruebas.Tests;
 // ver AutoReplyPrintSdk.cs y "Supuestos y riesgos" en Docs/Prueba_Dia3_Impresora.md).
 public static partial class HardwareTests
 {
+    public static void Test_PingImpresora()
+    {
+        var cfg = HardwareConfig.Actual.Impresora;
+        var r = new Reporte($"Impresora KP-80A - Ping (modo {cfg.Modo})");
+        try
+        {
+            if (cfg.Modo.Equals("UsbSdk", StringComparison.OrdinalIgnoreCase))
+            {
+                // Windows ve esta impresora como CP001/USBPort ("USB Printing Support" genuino, confirmado
+                // 2026-10-17 en Propiedades > Puertos), así que CP_Port_OpenUsb es la ruta nativa correcta,
+                // no CP_Port_OpenCom. El fallo anterior se sospecha del controlador de Windows reteniendo el
+                // puerto mientras la cola "POS80 Printer" está instalada — ver Supuestos y riesgos.
+                var h = AutoReplyPrintSdk.Abrir(cfg.NombreUsb);
+                if (r.Criterio($"Apertura de impresora USB '{cfg.NombreUsb}' vía SDK (autoreply)", AutoReplyPrintSdk.EsValido(h)))
+                {
+                    if (AutoReplyPrintSdk.ConsultarEstado(h, 1000, out var estado))
+                        Consola.Info($"        Estado: {AutoReplyPrintSdk.DescribirEstado(estado)}");
+                    else
+                        Consola.Aviso("        Sin respuesta de estado (sin verificación garantizada por el SDK; se avisa, no bloquea).");
+                    AutoReplyPrintSdk.Cerrar(h);
+                }
+            }
+            else if (cfg.Modo.Equals("Serial", StringComparison.OrdinalIgnoreCase))
+            {
+                using var puerto = new SerialPort(cfg.Puerto, cfg.BaudRate, Parity.None, 8, StopBits.One)
+                {
+                    ReadTimeout = 500,
+                    WriteTimeout = 2000,
+                    DtrEnable = true, // ver CcTalk.cs: algunos adaptadores necesitan esto para habilitarse
+                    RtsEnable = true,
+                };
+                puerto.Open();
+                r.Criterio($"Apertura de {cfg.Puerto} @ {cfg.BaudRate}", puerto.IsOpen);
+
+                puerto.Write(EscPos.EstadoEnLinea, 0, EscPos.EstadoEnLinea.Length);
+                Thread.Sleep(200);
+                if (puerto.BytesToRead > 0)
+                {
+                    var estado = (byte)puerto.ReadByte();
+                    r.Criterio("Impresora en línea (DLE EOT 1)", EscPos.EstaEnLinea(estado), $"estado=0x{estado:X2}");
+                }
+                else
+                {
+                    Consola.Aviso("        Sin respuesta a DLE EOT 1 (no todas las KP-80A lo responden por serial).");
+                }
+            }
+            else
+            {
+                r.Criterio($"Cola '{cfg.NombreImpresora}' existe y se puede abrir", ImpresoraRaw.Existe(cfg.NombreImpresora));
+            }
+        }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
     public static void Test_ImprimirVoucherPrueba()
     {
         var cfg = HardwareConfig.Actual.Impresora;
@@ -102,12 +157,202 @@ public static partial class HardwareTests
         finally { AutoReplyPrintSdk.Cerrar(h); }
     }
 
+    // Voucher con el formato de un comprobante real de cambio de divisas (logo + datos de la operación).
+    // Requiere modo UsbSdk: el logo y los tamaños de fuente usan funciones del SDK del fabricante
+    // (CP_Pos_PrintRasterImageFromFile / CP_Pos_SetTextScale) que no tienen equivalente ya implementado
+    // en el camino ESC/POS crudo (Raw/Serial) de este proyecto.
+    public static void Test_ImprimirVoucherOperacion()
+    {
+        var cfg = HardwareConfig.Actual.Impresora;
+        var r = new Reporte($"Impresora KP-80A - Voucher de operación (logo + formato tradicional, modo {cfg.Modo})");
+        try
+        {
+            // El SDK (autoreplyprint.dll) no se pudo destrabar en esta máquina (ver AutoReplyPrintSdk.Abrir):
+            // logo y tamaños de fuente también son comandos ESC/POS estándar (GS v 0, GS !), así que
+            // Spooler/Serial los arman a mano en vez de depender del SDK para esto.
+            if (cfg.Modo.Equals("UsbSdk", StringComparison.OrdinalIgnoreCase))
+                ImprimirVoucherPorSdk(r, cfg);
+            else
+                ImprimirVoucherPorEscPos(r, cfg);
+        }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
+    private static void ImprimirVoucherPorEscPos(Reporte r, ImpresoraConfig cfg)
+    {
+        var ahora = DateTime.Now;
+        var folio = ahora.ToString("yyMMdd-HHmmss");
+        var montoEntregadoUsd = 100.00m;
+        var tipoCambio = 18.50m;
+        var comision = 0.00m;
+        var montoRecibidoMxn = montoEntregadoUsd * tipoCambio - comision;
+
+        var rutaLogo = Path.Combine(AppContext.BaseDirectory, cfg.RutaLogo);
+        var logoExiste = File.Exists(rutaLogo);
+        r.Criterio($"Logo encontrado en '{rutaLogo}' (Impresora.RutaLogo)", logoExiste);
+
+        var partes = new List<byte[]> { EscPos.Inicializar, EscPos.Centrar };
+        if (logoExiste)
+        {
+            // Mismo tamaño que en el SDK: 576 dots = ancho imprimible de 80mm @ 203dpi; 147 proporcional
+            // al logo.png real (2560x655) para no deformarlo.
+            var bits = EscPos.ImagenDesdeArchivo(rutaLogo, anchoDots: 576, altoDots: 147);
+            partes.Add(EscPos.ImagenRaster(bits, 576, 147));
+            partes.Add(EscPos.SaltoLinea);
+        }
+
+        partes.Add(EscPos.EscalaTexto(1, 1));
+        partes.Add(EscPos.NegritaOn);
+        partes.Add(EscPos.Texto("COMPROBANTE DE OPERACION"));
+        partes.Add(EscPos.SaltoLinea);
+        partes.Add(EscPos.NegritaOff);
+        partes.Add(EscPos.EscalaTexto(0, 0));
+        partes.Add(EscPos.Izquierda);
+
+        var separador = new string('-', 32);
+        void Linea(string texto) { partes.Add(EscPos.Texto(texto)); partes.Add(EscPos.SaltoLinea); }
+
+        Linea(separador);
+        Linea($"Fecha:        {ahora:yyyy-MM-dd HH:mm:ss}");
+        Linea("Operacion:    COMPRA DE DOLARES");
+        Linea(separador);
+        Linea($"Entregado:    USD {montoEntregadoUsd:N2}");
+        Linea("  5 x USD   20.00");
+        Linea(separador);
+        Linea($"Recibido:     MXN {montoRecibidoMxn:N2}");
+        Linea("  3 x MXN  500.00");
+        Linea("  1 x MXN  200.00");
+        Linea("  1 x MXN  100.00");
+        Linea(" 10 x MXN    5.00");
+        Linea(separador);
+        Linea($"Tipo de cambio: {tipoCambio:N2}");
+        Linea($"Comision:       MXN {comision:N2}");
+        Linea(separador);
+        Linea("Identificacion: Nivel 2 - INE validada");
+        Linea(separador);
+        Linea("Terminal:     ATM-FINSO-01");
+        Linea($"Folio:        {folio}");
+        Linea(separador);
+        partes.Add(EscPos.Centrar);
+        Linea("Gracias por su preferencia");
+        partes.Add(EscPos.SaltoLinea);
+        partes.Add(EscPos.SaltoLinea);
+        partes.Add(EscPos.AvanzarYCortar);
+
+        var voucher = EscPos.Concatenar(partes.ToArray());
+        r.Criterio("Contenido del voucher armado (logo + texto, ESC/POS crudo)", true);
+
+        if (cfg.Modo.Equals("Serial", StringComparison.OrdinalIgnoreCase))
+            EnviarPorSerial(r, cfg, voucher);
+        else
+        {
+            ImpresoraRaw.Enviar(cfg.NombreImpresora, voucher);
+            r.Criterio($"{voucher.Length} bytes entregados al spooler de '{cfg.NombreImpresora}'", true);
+        }
+
+        r.Criterio("El asistente ve el logo de FINSO impreso arriba del ticket",
+            Consola.PreguntarAsistente("¿Se ve el logo de FINSO (letras azules + figura verde) arriba del ticket?"));
+        r.Criterio("El asistente ve los datos de la operación con formato de voucher tradicional (fecha, operación, montos, denominaciones, tipo de cambio, identificación, terminal y folio)",
+            Consola.PreguntarAsistente("¿El ticket muestra esos datos en líneas separadas, con separadores, como un comprobante normal?"));
+        r.Criterio("El autocortador cortó el papel", Consola.PreguntarAsistente("¿El ticket salió cortado (suelto)?"));
+    }
+
+    private static void ImprimirVoucherPorSdk(Reporte r, ImpresoraConfig cfg)
+    {
+        var h = AutoReplyPrintSdk.Abrir(cfg.NombreUsb);
+        if (!r.Criterio($"Apertura de impresora USB '{cfg.NombreUsb}' vía SDK (autoreply)", AutoReplyPrintSdk.EsValido(h)))
+            return;
+
+        try
+        {
+            AutoReplyPrintSdk.Reset(h);
+
+            // Datos de muestra: una operación de compra de dólares consistente con los casetes reales
+            // (recicladora acepta USD20, dispensa MXN 500/200/100; monederos dispensan MXN $1/$5) —
+            // no viene de una transacción real, es solo para probar el formato de impresión.
+            var ahora = DateTime.Now;
+            var folio = ahora.ToString("yyMMdd-HHmmss");
+            var montoEntregadoUsd = 100.00m;
+            var tipoCambio = 18.50m;
+            var comision = 0.00m;
+            var montoRecibidoMxn = montoEntregadoUsd * tipoCambio - comision;
+
+            var rutaLogo = Path.Combine(AppContext.BaseDirectory, cfg.RutaLogo);
+            var logoExiste = File.Exists(rutaLogo);
+            if (logoExiste)
+            {
+                // 576 dots = ancho imprimible estándar de 80mm @ 203dpi (72mm; el resto son márgenes
+                // del cabezal). 147 = alto proporcional al 2560x655 real de logo.png, para no deformarlo.
+                AutoReplyPrintSdk.Alinear(h, AutoReplyPrintSdk.AlineacionCentro);
+                r.Criterio("Logo entregado al SDK (CP_Pos_PrintRasterImageFromFile)",
+                    AutoReplyPrintSdk.ImprimirImagen(h, rutaLogo, anchoDots: 576, altoDots: 147));
+                AutoReplyPrintSdk.AvanzarLineas(h, 1);
+            }
+            else
+            {
+                r.Criterio($"Logo encontrado en '{rutaLogo}' (Impresora.RutaLogo)", false);
+            }
+
+            AutoReplyPrintSdk.EscalaTexto(h, 1, 1);
+            AutoReplyPrintSdk.Negrita(h, true);
+            AutoReplyPrintSdk.Texto(h, "COMPROBANTE DE OPERACION");
+            AutoReplyPrintSdk.AvanzarLineas(h, 1);
+            AutoReplyPrintSdk.Negrita(h, false);
+            AutoReplyPrintSdk.EscalaTexto(h, 0, 0);
+            AutoReplyPrintSdk.Alinear(h, AutoReplyPrintSdk.AlineacionIzquierda);
+
+            var separador = new string('-', 32);
+            void Linea(string texto) { AutoReplyPrintSdk.Texto(h, texto); AutoReplyPrintSdk.AvanzarLineas(h, 1); }
+
+            Linea(separador);
+            Linea($"Fecha:        {ahora:yyyy-MM-dd HH:mm:ss}");
+            Linea("Operacion:    COMPRA DE DOLARES");
+            Linea(separador);
+            Linea($"Entregado:    USD {montoEntregadoUsd:N2}");
+            Linea("  5 x USD   20.00");
+            Linea(separador);
+            Linea($"Recibido:     MXN {montoRecibidoMxn:N2}");
+            Linea("  3 x MXN  500.00");
+            Linea("  1 x MXN  200.00");
+            Linea("  1 x MXN  100.00");
+            Linea(" 10 x MXN    5.00");
+            Linea(separador);
+            Linea($"Tipo de cambio: {tipoCambio:N2}");
+            Linea($"Comision:       MXN {comision:N2}");
+            Linea(separador);
+            Linea("Identificacion: Nivel 2 - INE validada");
+            Linea(separador);
+            Linea("Terminal:     ATM-FINSO-01");
+            Linea($"Folio:        {folio}");
+            Linea(separador);
+            AutoReplyPrintSdk.Alinear(h, AutoReplyPrintSdk.AlineacionCentro);
+            Linea("Gracias por su preferencia");
+            AutoReplyPrintSdk.AvanzarLineas(h, 2);
+            r.Criterio("Contenido del voucher entregado al SDK", true);
+
+            r.Criterio("Corte completo aceptado por el SDK", AutoReplyPrintSdk.CorteCompleto(h));
+
+            var salioImpreso = AutoReplyPrintSdk.ConsultarResultadoImpresion(h, 3000);
+            r.Criterio("El SDK confirma que el ticket se imprimió (QueryPrintResult)", salioImpreso);
+
+            r.Criterio("El asistente ve el logo de FINSO impreso arriba del ticket",
+                Consola.PreguntarAsistente("¿Se ve el logo de FINSO (letras azules + figura verde) arriba del ticket?"));
+            r.Criterio("El asistente ve los datos de la operación con formato de voucher tradicional (fecha, operación, montos, denominaciones, tipo de cambio, identificación, terminal y folio)",
+                Consola.PreguntarAsistente("¿El ticket muestra esos datos en líneas separadas, con separadores, como un comprobante normal?"));
+            r.Criterio("El autocortador cortó el papel", Consola.PreguntarAsistente("¿El ticket salió cortado (suelto)?"));
+        }
+        finally { AutoReplyPrintSdk.Cerrar(h); }
+    }
+
     private static void EnviarPorSerial(Reporte r, ImpresoraConfig cfg, byte[] datos)
     {
         using var puerto = new SerialPort(cfg.Puerto, cfg.BaudRate, Parity.None, 8, StopBits.One)
         {
             ReadTimeout = 500,
             WriteTimeout = 2000,
+            DtrEnable = true,
+            RtsEnable = true,
         };
         puerto.Open();
         r.Criterio($"Apertura de {cfg.Puerto} @ {cfg.BaudRate}", puerto.IsOpen);

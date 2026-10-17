@@ -15,6 +15,8 @@
     <GrgSdkDir Condition="'$(GrgSdkDir)' == ''">$(MSBuildProjectDirectory)\referencias_integracion\CRM9250NDev_V2.3.7.6\dll\</GrgSdkDir>
     <!-- autoreplyprint.dll nativa (win32) del SDK de la impresora KP-80A, usada solo en modo Impresora.Modo=UsbSdk. -->
     <PrinterSdkDir Condition="'$(PrinterSdkDir)' == ''">$(MSBuildProjectDirectory)\referencias_integracion\Receipt Printer(KP-80A)\autoreplyprint_dll_win32\</PrinterSdkDir>
+    <!-- TWRPassportAPI.dll y sus dependencias (SDK del lector MEPR500+), usadas solo con Escaner.Simulado=false. -->
+    <ScannerSdkDir Condition="'$(ScannerSdkDir)' == ''">$(MSBuildProjectDirectory)\referencias_integracion\Passport scanner(MEPR500+)\MEPR500 Windows SDK 20230815\BinTW-20230815 DEMO\</ScannerSdkDir>
   </PropertyGroup>
 
   <!-- referencias_integracion es material de consulta (demo WinForms, headers, PDFs): no se compila ni se copia. -->
@@ -25,12 +27,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="OpenCvSharp4" Version="4.10.0.20241108" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.10.0.20241108" />
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="hardware.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Config\CodigosLogicosGrg.tsv" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="logo.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup Condition="Exists('$(GrgSdkDir)CRM9250NDev.dll')">
@@ -45,6 +50,17 @@
   </ItemGroup>
   <Target Name="AvisoSdkImpresora" BeforeTargets="Build" Condition="!Exists('$(PrinterSdkDir)autoreplyprint.dll')">
     <Warning Text="No se encontró autoreplyprint.dll en '$(PrinterSdkDir)' (solo necesaria para Impresora.Modo=UsbSdk). Use -p:PrinterSdkDir=&lt;carpeta&gt; o copie la DLL a mano junto al .exe." />
+  </Target>
+
+  <!-- Del resto de la carpeta del demo (IDRead.exe, Photo/Picture, logs) solo hace falta tessdata/: confirmado
+       en la máquina real (2026-10-16) que TWRPassportAPI.dll usa Tesseract/OCR internamente y falla al
+       inicializarse sin esos archivos (ni siquiera carga la DLL, con "DLL initialization routine failed"). -->
+  <ItemGroup Condition="Exists('$(ScannerSdkDir)TWRPassportAPI.dll')">
+    <None Include="$(ScannerSdkDir)*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(ScannerSdkDir)tessdata\**\*.*" Link="tessdata\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="AvisoSdkEscaner" BeforeTargets="Build" Condition="!Exists('$(ScannerSdkDir)TWRPassportAPI.dll')">
+    <Warning Text="No se encontró TWRPassportAPI.dll en '$(ScannerSdkDir)' (solo necesaria para Escaner.Simulado=false). Use -p:ScannerSdkDir=&lt;carpeta&gt; o copie la carpeta a mano junto al .exe." />
   </Target>
 
 </Project>

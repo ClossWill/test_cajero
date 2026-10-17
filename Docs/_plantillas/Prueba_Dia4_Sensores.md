@@ -13,6 +13,7 @@ Leer el puerto COM del ALB02 en un bucle reactivo y mostrar `¡PUERTA ABIERTA!` 
 ## Precondiciones
 
 - ALB02 alimentado y conectado al COM; puerto y baudios (9600 por defecto) confirmados con el manual del módulo.
+- **Puerto confirmado en la máquina real (2026-10-16) con `Test_PingSensores`:** `COM5` (el valor por defecto) abre correctamente — a diferencia de monederos y LEDs, aquí el supuesto original resultó ser el correcto.
 - Acceso al gabinete para abrir/cerrar la puerta y golpearlo con cuidado.
 - Cerradura S&G operable (para abrir sin forzar).
 
@@ -47,9 +48,11 @@ Los valores de `Tramas` del ejemplo son **ilustrativos**; deben sustituirse con 
 ## Cómo ejecutar
 
 1. Menú `7` (calibración): seguir las instrucciones de reposo, puerta abierta, puerta cerrada y vibración; copiar las tramas a `hardware.json`.
-2. Menú `8` (escucha): manipular el gabinete; `Q` termina. Equivalente desde `Main`:
+2. Menú `8` (escucha): manipular el gabinete; `Q` termina.
+3. Menú `16` (ping: solo abre el puerto COM; el ALB02 es reactivo, no hay comando de consulta que responder). Equivalente desde `Main`:
 
 ```csharp
+HardwareTests.Test_PingSensores();
 HardwareTests.Test_CalibrarSensores();
 HardwareTests.Test_EscucharSensores();
 ```

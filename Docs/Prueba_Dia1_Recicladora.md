@@ -15,7 +15,7 @@ Demostrar que desde C# podemos abrir el dispositivo, inicializarlo, **aceptar un
 | Inicializar (menú 1, **no mueve nada**) | pre-vuelo de la DLL → `hOpenLogicDevice("CRM9250NDev")` → `iSetCommPara` → `iGetCassetteInfoEx` (informativa) → `iGetDevVersionEx` → `iGetDevStatusEx` |
 | Reinicio mecánico (menú 11, **se mueve**) | lo anterior + `iPowerOnInitEx` (= `iInitSettingEx` + `iGetCassetteInfoEx` + `iInitEx`), previa confirmación del asistente. Lo piden solas las opciones 2 y 3, una vez por sesión |
 | Aceptar | `iPrepareDeposit` → `iOpenShutter` → *(usuario inserta)* → `iCloseShutter` → `iCashCount` → `iStoreMoneyEx` **o** `iCancelDepositEx` → `iPrepareNextTransaction` |
-| Dispensar | `iPrepareDispense` → `iDispenseEx` → *(usuario retira)* → `iPrepareNextTransaction` |
+| Dispensar | `iPrepareDispense` → `iDispenseEx` (1 a 4 casetes en la misma orden) → `iOpenShutter` → *(usuario retira)* → `iCloseShutter` → `iPrepareNextTransaction` |
 
 ## Precondiciones
 
@@ -28,17 +28,22 @@ Demostrar que desde C# podemos abrir el dispositivo, inicializarlo, **aceptar un
 - Los cuatro casetes con unos pocos billetes de su denominación (anotar cuántos, para cuadrar al final).
 - Límite de seguridad: `MaxBilletesPrueba` (5 por defecto) impide dispensar cantidades grandes por error.
 
-## Configuración física (fuente: `Finso_TAC_Logical_Tecnica.pdf` §2)
+## Configuración física
 
-| Recurso | Moneda / denominación | Función |
-| :-- | :-- | :-- |
-| Cassette 1 | USD 20 | Dispensa USD (única denominación USD de salida) |
-| Cassette 2 | MXN 500 | Dispensa MXN |
-| Cassette 3 | MXN 200 | Dispensa MXN |
-| Cassette 4 | MXN 100 | Dispensa MXN |
-| Recycler | Otras denominaciones USD / MXN | Recibe billetes válidos que no se dispensan |
+Orden confirmado por observación directa de la gaveta física (2026-10-15): al jalarla, lo primero que sale es
+el casete de USD 20, luego MXN 100, 200 y 500, y al final el recycler de banda azul. Esto **reemplaza** el
+orden que traía `Finso_TAC_Logical_Tecnica.pdf` §2 (que ponía MXN 500 antes de MXN 100 — ver "Supuestos y
+riesgos" más abajo, sigue pendiente confirmar que la posición física == número RC del SDK).
 
-Por eso `Test_DispensarBilletes` recibe moneda **y denominación**: `("MXN", 500)` va al casete 2, `("USD", 20)` al casete 1. Si la moneda tiene varios casetes y no se indica la denominación, la prueba se detiene y lo pide.
+| Posición en la gaveta | Recurso | Moneda / denominación | Función |
+| :-- | :-- | :-- | :-- |
+| 1ª (sale primero) | Cassette 1 | USD 20 | Dispensa USD (única denominación USD de salida) |
+| 2ª | Cassette 2 | MXN 100 | Dispensa MXN |
+| 3ª | Cassette 3 | MXN 200 | Dispensa MXN |
+| 4ª | Cassette 4 | MXN 500 | Dispensa MXN |
+| 5ª (al final) | Recycler (banda azul) | Otras denominaciones USD / MXN | Recibe billetes válidos que no se dispensan |
+
+Por eso `Test_DispensarBilletes` recibe una lista de renglones **(moneda, denominación, cantidad)**: `("MXN", 100, 1)` va al casete 2, `("USD", 20, 1)` al casete 1. El recycler de banda azul no aparece en `Casetes`, así que nunca es una opción para dispensar. Se puede pedir más de un renglón en la misma llamada — ej. `("MXN", 500, 1), ("MXN", 200, 1), ("MXN", 100, 1)` para armar $800 MXN — y los tres salen en **una sola orden atómica** a `iDispenseEx` (el struct del SDK soporta hasta 16 casetes por orden; aquí hay 4 configurados como máximo).
 
 ```json
 "Recicladora": {
@@ -52,9 +57,9 @@ Por eso `Test_DispensarBilletes` recibe moneda **y denominación**: `("MXN", 500
   "MaxBilletesPrueba": 5,
   "Casetes": [
     { "Indice": 1, "Nombre": "Cassette 1", "Moneda": "USD", "Denominacion": 20 },
-    { "Indice": 2, "Nombre": "Cassette 2", "Moneda": "MXN", "Denominacion": 500 },
+    { "Indice": 2, "Nombre": "Cassette 2", "Moneda": "MXN", "Denominacion": 100 },
     { "Indice": 3, "Nombre": "Cassette 3", "Moneda": "MXN", "Denominacion": 200 },
-    { "Indice": 4, "Nombre": "Cassette 4", "Moneda": "MXN", "Denominacion": 100 }
+    { "Indice": 4, "Nombre": "Cassette 4", "Moneda": "MXN", "Denominacion": 500 }
   ],
   "EtiquetaDenominacion": {}
 }
@@ -71,10 +76,10 @@ El desarrollador opera la consola a distancia y un asistente en sitio mete y sac
 | Momento | Qué pasa en consola | Qué hace el asistente |
 | :-- | :-- | :-- |
 | Antes de abrir el shutter o dispensar | `!! VA A MOVERSE` + "¿El asistente está listo?" | Aleja las manos y dice "listo". Si responde que no, la prueba se detiene sin mover nada |
-| Aceptar: antes de insertar | Pregunta qué billete tiene a la mano | Dice cuál es (queda en la bitácora junto al código del SDK) |
+| Aceptar: antes de insertar | Pregunta qué billete(s) tiene a la mano (uno o varios, separados por coma) | Los dice (quedan en la bitácora junto al código del SDK de cada uno) |
 | Aceptar: shutter abierto | "¿Ve el shutter abierto?" | Lo confirma (R-06 físico) |
-| Aceptar: al insertar | Bloquea hasta "listo"; **al dar ENTER el shutter se cierra** | Inserta, retira la mano por completo y solo entonces dice "listo" |
-| Devolución | Aviso antes de abrir; luego "¿Cuántos billetes retiró?" | Retira y dice el número |
+| Aceptar: al insertar | Bloquea hasta "listo"; **al dar ENTER el shutter se cierra** | Inserta todos juntos, en la misma apertura, retira la mano por completo y solo entonces dice "listo" |
+| Devolución | Aviso antes de abrir; luego "¿Cuántos billetes retiró?" | Retira todos y dice el número total |
 | Dispensa | "¿Cuántos billetes hay en el shutter?" (también si `iDispenseEx` falló) | Los cuenta **sin tocarlos**, dice el número y la denominación, luego los retira |
 
 Los conteos se piden como número y no como sí/no para no inducir la respuesta. Toda la sesión queda en `bitacoras\sesion_*.txt` junto al `.exe`: es la evidencia que se comparte.
@@ -155,12 +160,16 @@ public static partial class HardwareTests
         {
             if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
 
-            // Se pregunta antes de insertar: el asistente prepara el billete y queda registrado qué era.
-            var billete = Consola.PreguntarTextoAsistente(esperaRechazo
+            // Se pregunta antes de insertar: el asistente prepara los billetes y queda registrado cuáles eran.
+            // Según el demo del fabricante, el depósito real es por lote: se meten varios billetes juntos en
+            // la misma apertura y la máquina los lee, cuenta y enruta a sus casetes uno por uno internamente.
+            var billeteTexto = Consola.PreguntarTextoAsistente(esperaRechazo
                 ? "Tenga a la mano UN billete inválido (roto, fotocopia o de otra moneda). ¿Cuál es?"
-                : "Tenga a la mano UN billete. ¿Cuál es? (ej. MXN 100, USD 20)");
+                : "Tenga a la mano los billetes que va a depositar juntos (uno o varios, pueden ser de distinta denominación). ¿Cuáles son? (separe por coma, ej. MXN 500, MXN 200, MXN 100)");
+            var billetes = billeteTexto.Split(',').Select(b => b.Trim()).Where(b => b.Length > 0).ToList();
+            var esperados = esperaRechazo ? 1 : Math.Max(billetes.Count, 1);
             if (!r.Criterio("Asistente listo antes de abrir el shutter",
-                    Consola.AntesDeMover("se abrirá el shutter para recibir el billete")))
+                    Consola.AntesDeMover("se abrirá el shutter para recibir el/los billete(s)")))
             { r.Finalizar(); return; }
 
             using var s = new NativeScope();
@@ -178,8 +187,8 @@ public static partial class HardwareTests
                 r.Finalizar(); return;
             }
 
-            Consola.Asistente($"Inserte el billete ({billete}) en el shutter y retire la mano por completo. " +
-                              "Al decir \"listo\" el shutter SE CIERRA.");
+            Consola.Asistente($"Inserte junto(s), en la misma apertura, el/los billete(s) ({string.Join(" + ", billetes)}) en el shutter " +
+                              "y retire la mano por completo. Al decir \"listo\" el shutter SE CIERRA.");
 
             var cerrado = CrmOk(r, "iCloseShutter", CRM9250N.iCloseShutter(_crm, pStatus), pStatus);
 
@@ -195,11 +204,15 @@ public static partial class HardwareTests
                 r.Criterio("El billete inválido fue rechazado (rechazados ≥ 1 y ninguno contado)",
                     res.iRejectCount >= 1 && res.iTotalCount == 0, detalle);
             else
-                r.Criterio("Se contó al menos un billete", res.iTotalCount > 0, detalle);
+                // La máquina enruta cada billete a su casete internamente; aquí solo se puede verificar
+                // que contó tantos billetes como se insertaron (no a cuál casete fue cada uno).
+                r.Criterio($"Se contaron los {esperados} billete(s) esperados (según lo declarado por el asistente)",
+                    res.iTotalCount == esperados, detalle);
             ImprimirDenominaciones(res.sDenomNumInfo);
-            Consola.Info($"        Billete insertado (según el asistente): {(billete.Length > 0 ? billete : "sin dato")}");
-            if (!esperaRechazo && res.iTotalCount > 0 && billete.Length > 0)
-                Consola.Aviso($"        EVIDENCIA: asociar el código de arriba a \"{billete}\" en Recicladora.EtiquetaDenominacion (hardware.json)");
+            Consola.Info($"        Billete(s) insertado(s) (según el asistente): {(billetes.Count > 0 ? string.Join(" + ", billetes) : "sin dato")}");
+            if (!esperaRechazo && res.iTotalCount > 0 && billetes.Count > 0)
+                Consola.Aviso("        EVIDENCIA: comparar el desglose por código de arriba contra los billetes declarados y " +
+                              "asociar cada código a su denominación en Recicladora.EtiquetaDenominacion (hardware.json)");
 
             // Con billetes contados: guardarlos (confirma el depósito) o devolverlos al usuario.
             if (res.iTotalCount > 0 && Consola.Confirmar("¿Guardar los billetes en la recicladora (iStoreMoneyEx)? n = devolver"))
@@ -211,18 +224,18 @@ public static partial class HardwareTests
                 for (var i = 0; i < 4; i++) store.abyCassettePriority[i] = (byte)(i + 1);
                 var pStore = s.Entrada(store);
                 if (CrmOk(r, "iStoreMoneyEx", CRM9250N.iStoreMoneyEx(_crm, pStore, pStatus), pStatus))
-                    r.Criterio("El asistente confirma que el billete entró (shutter vacío)",
-                        Consola.PreguntarAsistente("¿El shutter quedó vacío (el billete entró a la máquina)?"));
+                    r.Criterio("El asistente confirma que el/los billete(s) entraron (shutter vacío)",
+                        Consola.PreguntarAsistente("¿El shutter quedó vacío (el/los billete(s) entraron a la máquina)?"));
             }
             else
             {
-                Consola.Asistente("El shutter se abrirá para devolver el billete. Mantenga las manos fuera y diga \"listo\".");
+                Consola.Asistente("El shutter se abrirá para devolver el/los billete(s). Mantenga las manos fuera y diga \"listo\".");
                 var cancel = Native.Cero<tCRM9250N_CancelDepositEx>();
                 var pCancel = s.Entrada(cancel);
                 CrmOk(r, "iCancelDepositEx", CRM9250N.iCancelDepositEx(_crm, pCancel, pStatus), pStatus);
-                // Se insertó un solo billete: debe volver ese mismo, contado o rechazado.
+                // Se insertaron "esperados" billetes: deben volver todos, contados o rechazados.
                 var devueltos = Consola.PreguntarNumeroAsistente("Retire lo que haya en el shutter. ¿Cuántos billetes retiró?");
-                r.Criterio("El asistente recuperó el billete insertado", devueltos == 1,
+                r.Criterio($"El asistente recuperó los {esperados} billete(s) insertados", devueltos == esperados,
                     $"devueltos según el asistente={devueltos?.ToString() ?? "sin respuesta"}");
             }
 
@@ -233,79 +246,173 @@ public static partial class HardwareTests
         r.Finalizar();
     }
 
-    /// <param name="denominacion">Valor del billete (500, 200, 100, 20). 0 = deducirlo si la moneda tiene un solo casete.</param>
-    public static void Test_DispensarBilletes(int cantidad, string moneda, int denominacion = 0)
+    /// <param name="pedido">
+    /// Uno o varios renglones (moneda, denominación, cantidad) a dispensar JUNTOS en una sola orden atómica
+    /// (iDispenseEx acepta hasta 16 RC a la vez: ver asReqDispInfo). Ej. para armar $800 MXN:
+    /// <c>Test_DispensarBilletes(("MXN", 500, 1), ("MXN", 200, 1), ("MXN", 100, 1))</c>.
+    /// Cada denominación debe corresponder a un único casete distinto de hardware.json (el recycler de banda
+    /// azul no aparece ahí, así que nunca es una opción). El shutter se abre una sola vez al final, para que
+    /// el cliente retire todo junto.
+    /// </param>
+    public static void Test_DispensarBilletes(params (string Moneda, int Denominacion, int Cantidad)[] pedido)
     {
-        var r = new Reporte($"Recicladora GRG 9250N - Dispensar {cantidad} billete(s) {moneda} {(denominacion > 0 ? denominacion : "")}".TrimEnd());
+        var resumen = string.Join(" + ", pedido.Select(p => $"{p.Cantidad}x{p.Moneda}{p.Denominacion}"));
+        var r = new Reporte($"Recicladora GRG 9250N - Dispensar {resumen}");
         try
         {
-            if (cantidad < 1 || cantidad > Crm.MaxBilletesPrueba)
+            if (pedido.Length == 0 || pedido.Length > Crm.Casetes.Count)
             {
-                r.Criterio($"Cantidad entre 1 y {Crm.MaxBilletesPrueba} (límite de seguridad de la prueba)", false);
+                r.Criterio($"Entre 1 y {Crm.Casetes.Count} renglón(es) (un casete dispensable distinto por renglón)",
+                    false, $"renglones={pedido.Length}");
                 r.Finalizar(); return;
             }
 
-            var candidatos = Crm.Casetes
-                .Where(c => c.Moneda.Equals(moneda, StringComparison.OrdinalIgnoreCase)
-                            && (denominacion == 0 || c.Denominacion == denominacion))
-                .ToList();
-            if (candidatos.Count != 1)
+            var totalPedido = pedido.Sum(p => p.Cantidad);
+            if (pedido.Any(p => p.Cantidad < 1) || totalPedido > Crm.MaxBilletesPrueba)
             {
-                var opciones = string.Join(", ", Crm.Casetes.Select(c => $"{c.Moneda} {c.Denominacion}"));
-                r.Criterio($"{moneda} {denominacion} corresponde a un único casete en hardware.json", false,
-                    $"coincidencias={candidatos.Count}. Casetes configurados: {opciones}. Indique la denominación.");
+                r.Criterio($"Cada renglón ≥ 1 billete y el total ≤ {Crm.MaxBilletesPrueba} (límite de seguridad de la prueba)",
+                    false, $"total pedido={totalPedido}");
                 r.Finalizar(); return;
             }
-            var cassette = candidatos[0];
-            var casete = cassette.Indice;
-            Consola.Info($"        Casete elegido: {cassette.Nombre} ({cassette.Moneda} {cassette.Denominacion}), índice SDK {casete}");
+
+            var renglones = new List<(CaseteConfig Cassette, int Cantidad)>();
+            foreach (var (moneda, denominacion, cantidad) in pedido)
+            {
+                var candidatos = Crm.Casetes
+                    .Where(c => c.Moneda.Equals(moneda, StringComparison.OrdinalIgnoreCase) && c.Denominacion == denominacion)
+                    .ToList();
+                if (candidatos.Count != 1)
+                {
+                    var opciones = string.Join(", ", Crm.Casetes.Select(c => $"{c.Moneda} {c.Denominacion}"));
+                    r.Criterio($"{moneda} {denominacion} corresponde a un único casete en hardware.json", false,
+                        $"coincidencias={candidatos.Count}. Casetes configurados: {opciones}.");
+                    r.Finalizar(); return;
+                }
+                renglones.Add((candidatos[0], cantidad));
+            }
+            if (renglones.Select(x => x.Cassette.Indice).Distinct().Count() != renglones.Count)
+            {
+                r.Criterio("Cada renglón apunta a un casete distinto (no se repite la misma denominación)", false);
+                r.Finalizar(); return;
+            }
+
+            foreach (var (cassette, cantidad) in renglones)
+                Evento($"Pedido: {cantidad}x {cassette.Nombre} ({cassette.Moneda} {cassette.Denominacion}), índice SDK {cassette.Indice}");
 
             if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
             if (!r.Criterio("Asistente listo antes de dispensar", Consola.AntesDeMover(
-                    $"se dispensarán {cantidad} billete(s) {cassette.Moneda} {cassette.Denominacion} y se abrirá el shutter")))
+                    $"se dispensarán {resumen} y se abrirá el shutter")))
             { r.Finalizar(); return; }
 
             using var s = new NativeScope();
             var pStatus = s.Salida<tDevReturn>();
 
+            Evento("iPrepareDispense: solicitando");
             if (!CrmOk(r, "iPrepareDispense", CRM9250N.iPrepareDispense(_crm, pStatus), pStatus))
             { r.Finalizar(); return; }
 
             var disp = Native.Cero<tCRM9250N_DispenseInfoEx>();
             disp.byDispType = Crm.TipoDispensa;
             disp.byRejectToAc = Crm.DestinoRechazoDispensa;
-            disp.asReqDispInfo[0] = new tCRM9250N_ReqDispInfo { wDenomOrCassetteInfo = (ushort)casete, iNum = cantidad };
+            for (var i = 0; i < renglones.Count; i++)
+                disp.asReqDispInfo[i] = new tCRM9250N_ReqDispInfo
+                { wDenomOrCassetteInfo = (ushort)renglones[i].Cassette.Indice, iNum = renglones[i].Cantidad };
             var pDisp = s.Entrada(disp);
 
+            Evento($"iDispenseEx: solicitando {resumen} (orden única, {renglones.Count} casete(s))");
             var ok = CrmOk(r, "iDispenseEx", CRM9250N.iDispenseEx(_crm, pDisp, pStatus), pStatus);
-            var dispensados = 0;
+
+            var dispensadoTotal = 0;
             if (ok)
             {
                 var res = Native.Leer<tCRM9250N_DispenseInfoEx>(pDisp);
-                dispensados = res.aiDispensedInfo.Sum();
-                var rechazados = res.aiRejectInfo.Sum();
-                r.Criterio($"La recicladora reporta {cantidad} billete(s) dispensado(s)", dispensados == cantidad,
-                    $"dispensados={dispensados} rechazados={rechazados}");
-                // El TAC exige conciliar contadores físicos: una orden de dispensa no equivale a entrega exitosa.
-                for (var i = 0; i < res.aiDispensedInfo.Length; i++)
-                    if (res.aiDispensedInfo[i] != 0 || res.aiRejectInfo[i] != 0)
-                        Consola.Info($"        Contador RC{i + 1}: dispensados={res.aiDispensedInfo[i]} rechazados={res.aiRejectInfo[i]}");
+                dispensadoTotal = res.aiDispensedInfo.Sum();
+                var rechazadoTotal = res.aiRejectInfo.Sum();
+                Evento($"iDispenseEx resultado: dispensados={dispensadoTotal} rechazados={rechazadoTotal}");
+                r.Criterio($"La recicladora reporta {totalPedido} billete(s) dispensado(s) en total", dispensadoTotal == totalPedido,
+                    $"dispensados={dispensadoTotal} rechazados={rechazadoTotal}");
+
+                // El TAC exige conciliar contadores físicos por casete: una orden de dispensa no equivale a entrega exitosa.
+                foreach (var (cassette, cantidad) in renglones)
+                {
+                    var idx = cassette.Indice - 1; // aiDispensedInfo/aiRejectInfo son 0-based, uno por RC1..RC16
+                    var d = idx >= 0 && idx < res.aiDispensedInfo.Length ? res.aiDispensedInfo[idx] : -1;
+                    var rj = idx >= 0 && idx < res.aiRejectInfo.Length ? res.aiRejectInfo[idx] : -1;
+                    r.Criterio($"Casete {cassette.Nombre} ({cassette.Moneda} {cassette.Denominacion}): {cantidad} pedido(s), {d} dispensado(s)",
+                        d == cantidad, $"rechazados={rj}");
+                }
             }
+
+            // No se asume que iDispenseEx abra el shutter por sí solo: se ordena explícitamente (VERIFICAR en el
+            // primer ciclo físico si ya estaba abierto o si esta llamada es la que lo mueve).
+            Evento("iOpenShutter: solicitando (para que el cliente retire todo junto)");
+            CrmOk(r, "iOpenShutter", CRM9250N.iOpenShutter(_crm, pStatus), pStatus);
 
             // Se pregunta también si iDispenseEx falló, para detectar una dispensa parcial (R-15).
             // Se pide el número, no un sí/no sobre el esperado, para no inducir la respuesta.
-            var esperados = ok ? cantidad : 0;
-            var vistos = Consola.PreguntarNumeroAsistente("Sin tocarlos todavía: ¿cuántos billetes hay en el shutter?");
+            var esperados = ok ? totalPedido : 0;
+            var vistos = Consola.PreguntarNumeroAsistente("Sin tocarlos todavía: ¿cuántos billetes hay en el shutter en total?");
+            Evento($"Asistente reporta {vistos?.ToString() ?? "sin respuesta"} billete(s) en el shutter (esperados={esperados})");
             r.Criterio($"El asistente cuenta {esperados} billete(s) en el shutter", vistos == esperados,
-                $"asistente={vistos?.ToString() ?? "sin respuesta"} reportados por la recicladora={dispensados}");
+                $"asistente={vistos?.ToString() ?? "sin respuesta"} total reportado por la recicladora={dispensadoTotal}");
+
             if (vistos > 0)
             {
-                r.Criterio($"Los billetes entregados son {cassette.Moneda} {cassette.Denominacion}",
-                    Consola.PreguntarAsistente($"¿Todos son de {cassette.Moneda} {cassette.Denominacion}?"));
-                Consola.Asistente("Retire los billetes y la mano del shutter. Al decir \"listo\" el shutter puede cerrarse.");
+                foreach (var (cassette, cantidad) in renglones)
+                {
+                    var vistosDenom = Consola.PreguntarNumeroAsistente($"¿Cuántos billetes de {cassette.Moneda} {cassette.Denominacion} ve?");
+                    r.Criterio($"El asistente ve {cantidad} billete(s) de {cassette.Moneda} {cassette.Denominacion}",
+                        vistosDenom == cantidad, $"asistente={vistosDenom?.ToString() ?? "sin respuesta"}");
+                }
+                Consola.Asistente("Retire todos los billetes y la mano del shutter. Al decir \"listo\" el shutter puede cerrarse.");
             }
 
+            Evento("iCloseShutter: solicitando");
+            CrmOk(r, "iCloseShutter", CRM9250N.iCloseShutter(_crm, pStatus), pStatus);
+            Evento("iPrepareNextTransaction: solicitando");
             CrmOk(r, "iPrepareNextTransaction", CRM9250N.iPrepareNextTransaction(_crm, pStatus), pStatus);
+        }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
+    /// <summary>Control manual del shutter, independiente del flujo de aceptar/dispensar. Sirve para diagnosticar
+    /// si ya está abierto/cerrado antes de asumir que otro comando (ej. iDispenseEx) lo mueve por su cuenta.</summary>
+    public static void Test_AbrirShutter()
+    {
+        var r = new Reporte("Recicladora GRG 9250N - Abrir shutter (control manual)");
+        try
+        {
+            if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
+            if (!r.Criterio("Asistente listo antes de abrir el shutter", Consola.AntesDeMover("se abrirá el shutter")))
+            { r.Finalizar(); return; }
+
+            using var s = new NativeScope();
+            var pStatus = s.Salida<tDevReturn>();
+            Evento("iOpenShutter: solicitando (manual)");
+            CrmOk(r, "iOpenShutter", CRM9250N.iOpenShutter(_crm, pStatus), pStatus);
+            r.Criterio("El asistente ve el shutter abierto", Consola.PreguntarAsistente("¿Ve el shutter abierto?"));
+        }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
+    /// <summary>Contraparte de <see cref="Test_AbrirShutter"/>: cierra el shutter sin pasar por depósito ni dispensa.</summary>
+    public static void Test_CerrarShutter()
+    {
+        var r = new Reporte("Recicladora GRG 9250N - Cerrar shutter (control manual)");
+        try
+        {
+            if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
+            if (!r.Criterio("Asistente listo antes de cerrar el shutter",
+                    Consola.AntesDeMover("se cerrará el shutter: manos y billetes fuera")))
+            { r.Finalizar(); return; }
+
+            using var s = new NativeScope();
+            var pStatus = s.Salida<tDevReturn>();
+            Evento("iCloseShutter: solicitando (manual)");
+            CrmOk(r, "iCloseShutter", CRM9250N.iCloseShutter(_crm, pStatus), pStatus);
+            r.Criterio("El asistente ve el shutter cerrado", Consola.PreguntarAsistente("¿Ve el shutter cerrado?"));
         }
         catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
         r.Finalizar();
@@ -416,6 +523,9 @@ public static partial class HardwareTests
             if (estado.asRcStatus[i].byExist != 0)
                 Consola.Info($"        Casete RC{i + 1}: status={estado.asRcStatus[i].byStatus} presente={estado.asRcStatus[i].byExist}");
     }
+
+    /// <summary>Línea de bitácora con timestamp para reconstruir la secuencia de eventos físicos/SDK de la dispensa.</summary>
+    private static void Evento(string texto) => Consola.Info($"        {DateTime.Now:HH:mm:ss.fff} {texto}");
 
     private static bool CrmOk(Reporte r, string funcion, int rc, IntPtr pStatus)
     {
@@ -651,26 +761,31 @@ public static partial class HardwareTests
 
 ## Cómo ejecutar
 
-Menú `1` (inicializar), `2` (aceptar), `3` (dispensar; pide cantidad, moneda y denominación), `10` (billete inválido, espera rechazo). Equivalente directo desde `Main`:
+Menú `1` (inicializar), `2` (aceptar), `3` (dispensar; pide moneda/denominación/cantidad y permite agregar más renglones a la misma orden), `10` (billete inválido, espera rechazo), `20`/`21` (abrir/cerrar shutter sueltos, para diagnosticar sin pasar por depósito ni dispensa). Equivalente directo desde `Main`:
 
 ```csharp
 HardwareTests.Test_InicializarRecicladora();
 HardwareTests.Test_AceptarBilletes();
 HardwareTests.Test_AceptarBilletes(esperaRechazo: true);
-HardwareTests.Test_DispensarBilletes(2, "MXN", 500);
-HardwareTests.Test_DispensarBilletes(1, "USD", 20);
+HardwareTests.Test_DispensarBilletes(("MXN", 500, 2));                              // un solo casete
+HardwareTests.Test_DispensarBilletes(("USD", 20, 1));
+HardwareTests.Test_DispensarBilletes(("MXN", 500, 1), ("MXN", 200, 1), ("MXN", 100, 1)); // $800 MXN en una sola orden atómica
+HardwareTests.Test_AbrirShutter();
+HardwareTests.Test_CerrarShutter();
 ```
 
 ## Escenarios de aceptación de billetes (derivados del TAC §14)
 
-Para cada billete se repite el flujo de `Test_AceptarBilletes` y se anota el código de denominación que devuelve el SDK.
+Según el demo del fabricante, el depósito real es por **lote**: el usuario mete varios billetes juntos en la misma apertura del shutter y la máquina los lee, cuenta y enruta a sus casetes uno por uno de forma interna — el software no controla ni puede verificar a qué casete fue cada billete, solo el conteo agregado (`iCashCount`, desglosado por código de denominación). `Test_AceptarBilletes` soporta esto: se declara la lista de billetes insertados juntos (`"MXN 500, MXN 200, MXN 100"`) y se compara el total contado contra el total declarado.
 
-| Billete a insertar | Resultado esperado |
+| Billete(s) a insertar | Resultado esperado |
 | :-- | :-- |
-| MXN 500, 200 y 100 (uno por vez) | Contado, denominación identificada. Es el flujo "Compra de USD" (el cliente entrega MXN). |
+| MXN 500 + 200 + 100 juntos, en una sola apertura | `iTotalCount == 3`, con un código de denominación distinto por cada uno en el desglose. Es el flujo "Compra de USD" (el cliente entrega MXN). |
 | USD 20 | Contado. Si el hardware lo permite, puede ir al cassette 1. |
 | Otra denominación USD (1, 5, 10, 50 o 100) | Contado y dirigido al recycler (no dispensable). Anotar si lo acepta o lo rechaza: es una decisión pendiente con el proveedor. |
 | Billete inválido (dañado, fotocopia, moneda no soportada) | Opción `10`: `rechazados ≥ 1`, ninguno contado, y el billete se devuelve. |
+
+Confirmar qué casete recibió cada billete requeriría abrir el gabinete en modo servicio y contar físicamente; no es algo que este harness (ni el asistente desde el shutter) pueda verificar, porque el SDK no expone un conteo en vivo por casete (solo `byStatus`/`byExist` por casete, sin cantidad).
 
 ## Criterios de aceptación
 
@@ -682,21 +797,24 @@ Para cada billete se repite el flujo de `Test_AceptarBilletes` y se anota el có
 | R-04 | El estado de casetes lista exactamente los casetes instalados físicamente | Comparar la salida con la máquina |
 | R-05 | `iGetDevVersionEx` devuelve una versión de firmware legible | Salida de consola |
 | R-06 | El shutter abre y cierra físicamente y `iCashCount` cuenta ≥ 1 billete | Observación + criterio automático |
-| R-07 | La denominación reportada corresponde al billete insertado | Comparación manual del código de denominación |
+| R-07 | La denominación reportada corresponde a cada billete insertado (lote de uno o varios) | Comparación manual del código de denominación contra lo declarado |
 | R-08 | `iStoreMoneyEx` guarda el billete **o** `iCancelDepositEx` lo devuelve por el shutter | Rc de éxito + observación física |
-| R-09 | `iDispenseEx` reporta exactamente `cantidad` billetes dispensados y 0 rechazados | Criterio automático |
-| R-10 | La cantidad física en el shutter coincide con lo reportado | El asistente cuenta los billetes; la consola compara su número con el reportado |
+| R-09 | `iDispenseEx` reporta exactamente el total pedido dispensado y 0 rechazados, y el contador por casete coincide con lo pedido en ese casete | Criterio automático (uno por casete en la orden) |
+| R-10 | La cantidad física en el shutter coincide con el total reportado, y el asistente identifica correctamente cuántos billetes ve de cada denominación pedida | El asistente cuenta el total y luego cada denominación por separado; la consola compara contra lo reportado |
 | R-11 | Tres ciclos consecutivos (aceptar + dispensar) sin reiniciar el programa ni la máquina | Repetición manual |
 | R-12 | Cada billete MXN 500/200/100 y USD 20 se identifica con un código de denominación distinto y estable (mismo billete → mismo código) | Tabla `EtiquetaDenominacion` completada |
 | R-13 | Un billete inválido se rechaza (`rechazados ≥ 1`, 0 contados) y el programa no se bloquea | Opción `10` |
-| R-14 | Se dispensa de cada casete configurado (USD 20, MXN 500, 200 y 100) y el contador del casete correcto coincide con lo entregado | Contadores por casete en consola + conteo físico |
+| R-14 | Se dispensa de cada casete configurado (USD 20, MXN 500, 200 y 100), incluyendo una orden que combine 2-3 casetes a la vez (ej. $800 MXN = 500+200+100), y el contador de cada casete coincide con lo entregado | Contadores por casete en consola + conteo físico por denominación |
 | R-15 | *(negativa, opcional)* Pedir billetes a un casete vacío o fuera de servicio devuelve un error controlado, sin dispensado parcial silencioso | Requiere un casete vacío. El TAC exige no marcar COMPLETED ante una dispensa parcial |
+| R-16 | Secuencia de eventos de la dispensa (`iPrepareDispense` → `iDispenseEx` → `iOpenShutter` → confirmación del asistente → `iCloseShutter` → `iPrepareNextTransaction`) queda con timestamp en la bitácora, para reconstruir cuándo se abrió/cerró el shutter frente a una orden con varios casetes | Líneas `Evento(...)` con `HH:mm:ss.fff` en `bitacoras\sesion_*.txt` |
 
-**Aprobado** = R-01 a R-14 cumplidos (R-15 es recomendable). Cualquier `rc` distinto del código de éxito se documenta con `iLogicCode`/`iPhyCode`/mensaje para consulta con el fabricante.
+**Aprobado** = R-01 a R-14 y R-16 cumplidos (R-15 es recomendable). Cualquier `rc` distinto del código de éxito se documenta con `iLogicCode`/`iPhyCode`/mensaje para consulta con el fabricante.
 
 ## Supuestos y riesgos
 
-- **Ya confirmado con el SDK de GRG:** nombre lógico `CRM9250NDev`, éxito `rc == 0`, `byDispType = 1` (por casete), casetes RC1..RC4 = 1..4, enlace USB y DLL x86. El mapa de denominaciones por casete sale del TAC §2.
+- **Ya confirmado con el SDK de GRG:** nombre lógico `CRM9250NDev`, éxito `rc == 0`, `byDispType = 1` (por casete), casetes RC1..RC4 = 1..4, enlace USB y DLL x86.
+- **Mapa de denominaciones por casete — corregido por observación física, no por el TAC:** el TAC §2 decía Cassette 2 = MXN 500, Cassette 3 = MXN 200, Cassette 4 = MXN 100. Al jalar la gaveta física (2026-10-15) el orden real es USD 20, MXN 100, MXN 200, MXN 500 y el recycler al final — es decir, MXN 500 y MXN 100 están invertidos respecto al TAC. `hardware.json` ya quedó con el orden observado. **Pendiente:** confirmar que "posición en la gaveta" equivale a "número RC del SDK" (es la suposición más razonable para un recycler, pero no está verificada por el SDK); la forma de confirmarlo es dispensar 1 billete de cada `Indice` y que el asistente diga a simple vista qué denominación salió — ya es parte de `Test_DispensarBilletes` (pregunta "¿Cuántos billetes de X ve?").
+- **Sin confirmar físicamente (primer ciclo del Día 1):** si `iDispenseEx` ya presenta los billetes en el shutter por sí solo, o si hace falta el `iOpenShutter` explícito que ahora manda `Test_DispensarBilletes` después de dispensar. El diagrama "5.2 Dispense" del PDF del SDK es una imagen que no se pudo extraer a texto ni renderizar en este entorno (falta `pdftoppm`), así que no hay confirmación documental — solo la observación en sitio decide si el llamado explícito es necesario o redundante.
 - **Sigue sin confirmarse:** qué significan los `LogicCode`/`PhyCode` que devuelva (están en `doc\CRM9250N LogicalCode.xls`), los códigos de denominación (`wCode`) de MXN/USD reales (la demo usa códigos de billetes de prueba de GRG, p. ej. `0xEE37`) y el contenido de `DevBaseDll.dll` y del driver USB.
 - **Discrepancia a aclarar con el proveedor:** el BEEX describe "4 casetes de **aceptación** (2,850 notas c/u)", mientras el TAC los trata como casetes de **dispensa**. El TAC §15 lista "qué denominaciones acepta y cuáles puede reciclar/dispensar" como decisión pendiente. Si los casetes resultan ser de otro tipo (`AC` en lugar de `RC` en `CRM9250N.cs`), cambia qué estructura de estado hay que leer.
 - Cualquier dispensado debe verificarse físicamente: el TAC establece que una orden de dispensa no equivale a una entrega exitosa. Por eso la prueba imprime los contadores por casete y pide la confirmación humana.

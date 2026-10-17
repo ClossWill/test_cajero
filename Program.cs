@@ -21,17 +21,25 @@ var menu = new (string Clave, string Texto, Action Accion)[]
     ("1", "Recicladora  - Inicializar (conecta, sin movimiento)", () => HardwareTests.Test_InicializarRecicladora()),
     ("11", "Recicladora - Reinicio mecánico (iPowerOnInitEx, SE MUEVE)", () => HardwareTests.Test_InicializarRecicladora(reinicioMecanico: true)),
     ("2", "Recicladora  - Aceptar billetes",         () => HardwareTests.Test_AceptarBilletes()),
-    ("3", "Recicladora  - Dispensar billetes",       () => HardwareTests.Test_DispensarBilletes(
-                                                         PedirEntero("Cantidad de billetes", 1), PedirTexto("Moneda (MXN/USD)", "MXN"),
-                                                         PedirEntero("Denominación (500/200/100 MXN, 20 USD)", 100))),
+    ("3", "Recicladora  - Dispensar billetes",       () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa())),
     ("10", "Recicladora - Billete inválido (espera rechazo)", () => HardwareTests.Test_AceptarBilletes(esperaRechazo: true)),
+    ("20", "Recicladora - Abrir shutter (control manual)",    HardwareTests.Test_AbrirShutter),
+    ("21", "Recicladora - Cerrar shutter (control manual)",   HardwareTests.Test_CerrarShutter),
     ("4", "Monederos    - Ping ccTalk",              HardwareTests.Test_PingMonederos),
     ("5", "Monederos    - Dispensar monedas",        () => HardwareTests.Test_DispensarMonedas(
                                                          PedirEntero("Monedas de $1", 2), PedirEntero("Monedas de $5", 1))),
     ("6", "Impresora    - Voucher de prueba",        HardwareTests.Test_ImprimirVoucherPrueba),
+    ("14", "Impresora   - Voucher de operación (logo + formato tradicional)", HardwareTests.Test_ImprimirVoucherOperacion),
+    ("15", "Impresora   - Ping (conexión, sin imprimir)", HardwareTests.Test_PingImpresora),
     ("7", "Sensores     - Calibrar tramas ALB02",    HardwareTests.Test_CalibrarSensores),
     ("8", "Sensores     - Escuchar (puerta/vibración)", HardwareTests.Test_EscucharSensores),
+    ("16", "Sensores    - Ping (abre el puerto COM)", HardwareTests.Test_PingSensores),
     ("9", "Escáner      - Leer documento",           HardwareTests.Test_EscanearDocumento),
+    ("17", "Escáner     - Ping (inicializa SDK, sin leer)", HardwareTests.Test_PingEscaner),
+    ("12", "LEDs        - Control de indicadores (18 canales)", HardwareTests.Test_ControlarLeds),
+    ("18", "LEDs        - Ping (firmware)",          HardwareTests.Test_PingLeds),
+    ("13", "Cámara      - Capturar foto (item 12 BEEX)",         HardwareTests.Test_CapturarRostro),
+    ("19", "Cámara      - Ping (abre el dispositivo)", HardwareTests.Test_PingCamara),
 };
 
 while (true)
@@ -70,4 +78,19 @@ static string PedirTexto(string pregunta, string porDefecto)
     Console.Write($"{pregunta} [{porDefecto}]: ");
     var t = Console.ReadLine()?.Trim();
     return string.IsNullOrEmpty(t) ? porDefecto : t;
+}
+
+// Arma una orden de dispensa de uno o varios casetes (ej. 500+200+100 MXN juntos) antes de mandarla como una
+// sola llamada atómica a iDispenseEx.
+static (string Moneda, int Denominacion, int Cantidad)[] PedirPedidoDispensa()
+{
+    var pedido = new List<(string Moneda, int Denominacion, int Cantidad)>();
+    do
+    {
+        var moneda = PedirTexto("Moneda (MXN/USD)", "MXN");
+        var denominacion = PedirEntero("Denominación (500/200/100 MXN, 20 USD)", 100);
+        var cantidad = PedirEntero("Cantidad de billetes de esa denominación", 1);
+        pedido.Add((moneda, denominacion, cantidad));
+    } while (Consola.Confirmar("¿Agregar otra denominación a la misma orden?"));
+    return pedido.ToArray();
 }

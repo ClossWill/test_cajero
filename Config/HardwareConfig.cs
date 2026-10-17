@@ -10,6 +10,8 @@ public sealed class HardwareConfig
     public EscanerConfig Escaner { get; set; } = new();
     public ImpresoraConfig Impresora { get; set; } = new();
     public SensoresConfig Sensores { get; set; } = new();
+    public LedsConfig Leds { get; set; } = new();
+    public CamaraConfig Camara { get; set; } = new();
 
     public static string RutaArchivo => Path.Combine(AppContext.BaseDirectory, "hardware.json");
 
@@ -45,13 +47,16 @@ public sealed class RecicladoraConfig
     public byte DestinoRechazoDeposito { get; set; } = 1;   // byRejectPos: 1 = AC1, 2 = AC2, 3 = LRB
     public int MaxBilletesPrueba { get; set; } = 5;
 
-    // Configuración física según TAC_Logical_Tecnica §2. Indice = número RC del SDK (base 1: RC1..RC4, como en la demo de GRG).
+    // Indice = número RC del SDK (base 1: RC1..RC4, como en la demo de GRG). Orden de denominaciones según
+    // observación física de la gaveta (2026-10-15): al jalarla, el primero en salir es USD 20, luego MXN 100,
+    // 200 y 500, y al final el recycler de banda azul. Reemplaza el orden del TAC_Logical_Tecnica §2 (que
+    // ponía MXN 500 antes de MXN 100) — sigue pendiente confirmar que "posición en la gaveta" == "número RC".
     public List<CaseteConfig> Casetes { get; set; } = new()
     {
         new() { Indice = 1, Nombre = "Cassette 1", Moneda = "USD", Denominacion = 20 },
-        new() { Indice = 2, Nombre = "Cassette 2", Moneda = "MXN", Denominacion = 500 },
+        new() { Indice = 2, Nombre = "Cassette 2", Moneda = "MXN", Denominacion = 100 },
         new() { Indice = 3, Nombre = "Cassette 3", Moneda = "MXN", Denominacion = 200 },
-        new() { Indice = 4, Nombre = "Cassette 4", Moneda = "MXN", Denominacion = 100 },
+        new() { Indice = 4, Nombre = "Cassette 4", Moneda = "MXN", Denominacion = 500 },
     };
 
     // Código de denominación del SDK (wCode) -> etiqueta legible. Se llena con lo observado en Test_AceptarBilletes.
@@ -78,10 +83,14 @@ public sealed class MonederosConfig
 {
     public int BaudRate { get; set; } = 9600;
     public int MaxMonedasPrueba { get; set; } = 10;
+    // Puerto y direcciones confirmados en la máquina real (2026-10-16) con el software oficial SCH2 y luego
+    // con Test_PingMonederos: COM1, no COM3 (el COM3 original era un supuesto nunca verificado). COM1 es de
+    // la tarjeta serial multi-puerto interna (ACPI\PNP0501), no del adaptador USB CP210x (ese es COM13/14,
+    // de otro periférico). Hacía falta además activar DTR/RTS al abrir el puerto (ver CcTalk.cs).
     public List<HopperConfig> Hoppers { get; set; } = new()
     {
-        new() { Nombre = "MK4 #1 ($1 MXN)", Denominacion = 1, Puerto = "COM3", Direccion = 3 },
-        new() { Nombre = "MK4 #2 ($5 MXN)", Denominacion = 5, Puerto = "COM3", Direccion = 4 },
+        new() { Nombre = "MK4 #1 ($1 MXN)", Denominacion = 1, Puerto = "COM1", Direccion = 3 },
+        new() { Nombre = "MK4 #2 ($5 MXN)", Denominacion = 5, Puerto = "COM1", Direccion = 4 },
     };
 }
 
@@ -98,6 +107,7 @@ public sealed class ImpresoraConfig
     public string Puerto { get; set; } = "COM4";
     public int BaudRate { get; set; } = 115200;
     public string NombreUsb { get; set; } = "POS80";
+    public string RutaLogo { get; set; } = "logo.png";
 }
 
 public sealed class SensoresConfig
@@ -106,4 +116,25 @@ public sealed class SensoresConfig
     public int BaudRate { get; set; } = 9600;
     public int SilencioTramaMs { get; set; } = 30;
     public Dictionary<string, string> Tramas { get; set; } = new();
+}
+
+// Tarjeta "18-Channel LED Light Bar Control Board" (modelo 24002-2): no es el ALB02, es una tarjeta
+// RS232 aparte para los 18 indicadores de función. Baudios confirmados en la hoja de protocolo del fabricante.
+// Puerto confirmado en la máquina real (2026-10-16) con Test_PingLeds: COM2 (no COM6, el valor original
+// nunca verificado), firmware "ADK LEDBOX V2.0-20240613". Necesitó DTR/RTS activados (ver LedControlSerial.cs).
+public sealed class LedsConfig
+{
+    public string Puerto { get; set; } = "COM2";
+    public int BaudRate { get; set; } = 19200;
+    public int Canales { get; set; } = 18;
+    // Cuántos de los 18 canales están conectados a un ícono identificable del gabinete (recibo, moneda,
+    // pasaporte, QR, efectivo). La prueba prueba canales uno por uno y se detiene en cuanto los identifica.
+    public int PerifericosEsperados { get; set; } = 5;
+}
+
+// Item 12 del BEEX (GDZS-DC004-MG3021): cámara USB estándar, detectada por Windows sin driver propio.
+public sealed class CamaraConfig
+{
+    public int IndiceDispositivo { get; set; } = 0;
+    public string CarpetaCapturas { get; set; } = "Capturas";
 }

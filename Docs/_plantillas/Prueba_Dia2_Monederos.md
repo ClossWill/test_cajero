@@ -24,13 +24,15 @@ Confirmar que el PC se comunica por puerto serial con los dos hoppers MK4 (ping 
   "BaudRate": 9600,
   "MaxMonedasPrueba": 10,
   "Hoppers": [
-    { "Nombre": "MK4 #1 ($1 MXN)", "Denominacion": 1, "Puerto": "COM3", "Direccion": 3 },
-    { "Nombre": "MK4 #2 ($5 MXN)", "Denominacion": 5, "Puerto": "COM3", "Direccion": 4 }
+    { "Nombre": "MK4 #1 ($1 MXN)", "Denominacion": 1, "Puerto": "COM1", "Direccion": 3 },
+    { "Nombre": "MK4 #2 ($5 MXN)", "Denominacion": 5, "Puerto": "COM1", "Direccion": 4 }
   ]
 }
 ```
 
 Si cada hopper está en un COM distinto, basta cambiar `Puerto`. El código abre cada puerto una sola vez aunque lo compartan.
+
+**Confirmado en la máquina real (2026-10-16):** el puerto es `COM1`, no `COM3` (el valor original era un supuesto nunca verificado). `COM1` es uno de los puertos de la tarjeta serial multi-puerto interna (`ACPI\PNP0501` en Device Manager), no del adaptador USB CP210x (ese expone `COM13`/`COM14`, de otro periférico — se probaron por error antes de encontrar el correcto). Se encontró comparando contra el software oficial del fabricante del hopper (**SCH2**, en `D:\SCH2`): Setup → puerto COM → `Hopper Address` 3 → Poll/Reset/Enable, todos `OK`. Direcciones 3 y 4 confirmadas con `Test_PingMonederos` (menú `4`): responden `Payout / SUH1-NOENCRYPT / SUH1-U3.0`.
 
 ## Código
 
@@ -83,7 +85,9 @@ HardwareTests.Test_DispensarMonedas(2, 1); // dos monedas de $1, una de $5
 - **Dispense (167), confirmado por el fabricante:** 9 bytes de datos = 8 en `00` + cantidad (1–255), sin cifrado (modo por defecto). El MK4 responde con 1 byte de datos (contador de eventos), por eso no se exige ACK vacío. Sondear `166` cada 200 ms con reintentos (~10 seguidos antes de declarar falla). El BEEX recomienda usar una librería ccTalk de código abierto; este código usa una implementación mínima propia, ya validada contra el manual del fabricante.
 - Las direcciones ccTalk se fijan por pines del hopper (tabla en "MK2 cctalk address.pdf": 3 = por defecto, 4, 5...). Cada hopper debe tener una distinta; si nadie responde, barrer 1–10 con Simple Poll.
 - Conviene que el primer intento use cantidades pequeñas (1 moneda) y vigilar atascos.
-- **Sin probar aún en la máquina real** (2026-10-14): el código compila; falta ejecutar `Test_PingMonederos` y `Test_DispensarMonedas` frente al hardware.
+- **`DtrEnable`/`RtsEnable` necesarios, confirmado en la máquina real (2026-10-16):** sin activarlos al abrir el puerto, Simple Poll no obtenía respuesta en ningún COM probado, aunque el puerto abría sin error — el adaptador RS232↔ccTalk de esta máquina alimenta o habilita su transceptor desde esas líneas, que .NET deja en `false` por defecto. Ya corregido en `CcTalk.cs`.
+- **`Test_PingMonederos` confirmado en la máquina real (2026-10-16):** los dos hoppers responden en `COM1`, direcciones 3 y 4 (`APROBADO 2/2`). Falta ejecutar `Test_DispensarMonedas` frente al hardware.
+- Mientras se buscaba el puerto correcto, un programa externo (SCH2 u otro) puede dejar el COM abierto en exclusiva: si `Test_PingMonederos` falla con "Apertura de COMx" (no con "sin respuesta"), revisar que no haya otra herramienta de prueba serial abierta al mismo tiempo.
 
 ## Evidencia a guardar
 
