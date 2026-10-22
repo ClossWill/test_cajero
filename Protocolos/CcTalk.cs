@@ -27,6 +27,7 @@ public sealed class CcTalkBus : IDisposable
     public const byte HRequestHopperStatus = 166;
     public const byte HRequestHighLowStatus = 217;
     public const byte HDispenseHopperCoins = 167;
+    public const byte HRequestCipherKey = 160;
 
     private readonly SerialPort _puerto;
 

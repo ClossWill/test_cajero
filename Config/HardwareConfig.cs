@@ -46,6 +46,12 @@ public sealed class RecicladoraConfig
     public byte DestinoRechazoDispensa { get; set; } = 1;   // byRejectToAc: 1 = AC1, 2 = AC2, 3 = LRB
     public byte DestinoRechazoDeposito { get; set; } = 1;   // byRejectPos: 1 = AC1, 2 = AC2, 3 = LRB
     public int MaxBilletesPrueba { get; set; } = 5;
+    public int SegundosRetiroBilletes { get; set; } = 60;   // espera a que retiren lo dispensado antes de cerrar el shutter
+    public byte DestinoRetract { get; set; } = 2;           // byRetractPos: 1 = LRB, 2 = AC, 3 = NE (eCRM9250N_RetractPos)
+    public int IntentosRecuperacion { get; set; } = 3;      // reinicios tras una dispensa fallida antes de pedir mantenimiento
+    // NOTEVALIDMODE de CRM9250NDevCfg.ini (0 = billete real, 15 = billete simulado, como CRM9250NTest.exe de GRG).
+    // El SDK solo lo lee del .ini al conectar: no hay campo equivalente en iDispenseEx/iCashCount.
+    public int ModoValidacionBilletes { get; set; } = 15;
 
     // Indice = número RC del SDK (base 1: RC1..RC4, como en la demo de GRG). Orden de denominaciones según
     // observación física de la gaveta (2026-10-15): al jalarla, el primero en salir es USD 20, luego MXN 100,

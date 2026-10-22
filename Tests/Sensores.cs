@@ -84,12 +84,10 @@ public static partial class HardwareTests
             ("VIBRACION", "Golpee suavemente el gabinete."),
         };
 
-        // Ventana amplia: entre el ENTER del desarrollador y la acción del asistente hay latencia de llamada.
         const int ventanaSegundos = 12;
         foreach (var (evento, instruccion) in pasos)
         {
-            Consola.Asistente($"[{evento}] Prepárese: {instruccion} Hágalo cuando le diga \"AHORA\".");
-            Consola.Esperar($"     ENTER y diga \"AHORA\" al asistente: se capturan {ventanaSegundos} s...");
+            Consola.Esperar($"  >> [{evento}] Prepárese: {instruccion} ENTER para empezar a capturar {ventanaSegundos} s...");
             puerto.DiscardInBuffer();
 
             var distintas = new Dictionary<string, int>();

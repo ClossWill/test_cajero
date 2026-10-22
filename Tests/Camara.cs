@@ -33,7 +33,7 @@ public static partial class HardwareTests
             using var captura = new VideoCapture(cfg.IndiceDispositivo);
             if (!r.Criterio("La cámara se abre (VideoCapture.IsOpened)", captura.IsOpened())) { r.Finalizar(); return; }
 
-            Consola.Asistente("Párese frente a la cámara, mirando al lente, con buena luz. Avise cuando esté listo.");
+            Consola.Aviso("  >> Párese frente a la cámara, mirando al lente, con buena luz, antes de ejecutar esta opción.");
 
             using var frame = new Mat();
             var leido = false;

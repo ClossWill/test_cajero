@@ -22,11 +22,12 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
     {
         ("1", "Inicializar (conecta, sin movimiento)", () => HardwareTests.Test_InicializarRecicladora()),
         ("11", "Reinicio mecánico (iPowerOnInitEx, SE MUEVE)", () => HardwareTests.Test_InicializarRecicladora(reinicioMecanico: true)),
-        ("2", "Aceptar billetes",         () => HardwareTests.Test_AceptarBilletes()),
+        ("2", "Abrir shutter para depósito (paso 1: coloque los billetes después)", HardwareTests.Test_AbrirShutterDeposito),
+        ("23", "Depositar en casetes (paso 2: cierra, cuenta y guarda)", HardwareTests.Test_DepositarEnCasetes),
         ("3", "Dispensar billetes",       () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa())),
-        ("10", "Billete inválido (espera rechazo)", () => HardwareTests.Test_AceptarBilletes(esperaRechazo: true)),
         ("20", "Abrir shutter (control manual)",    HardwareTests.Test_AbrirShutter),
         ("21", "Cerrar shutter (control manual)",   HardwareTests.Test_CerrarShutter),
+        ("22", "Consultar inventario (solo lectura)", HardwareTests.Test_ConsultarInventario),
     }),
     ("Monederos", new (string Clave, string Texto, Action Accion)[]
     {

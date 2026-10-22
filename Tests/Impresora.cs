@@ -94,9 +94,6 @@ public static partial class HardwareTests
                 ImpresoraRaw.Enviar(cfg.NombreImpresora, voucher);
                 r.Criterio($"{voucher.Length} bytes entregados al spooler de '{cfg.NombreImpresora}'", true);
             }
-
-            r.Criterio("Imprimió 'Hola Mundo FINSO' legible y en negritas", Consola.PreguntarAsistente("¿Salió un ticket con \"Hola Mundo FINSO\" en negritas?"));
-            r.Criterio("El autocortador cortó el papel", Consola.PreguntarAsistente("¿El ticket salió cortado (suelto)?"));
         }
         catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
         r.Finalizar();
@@ -150,9 +147,6 @@ public static partial class HardwareTests
 
             if (AutoReplyPrintSdk.ConsultarEstado(h, 1000, out var estadoFinal))
                 Consola.Info($"        Estado después de imprimir: {AutoReplyPrintSdk.DescribirEstado(estadoFinal)}");
-
-            r.Criterio("Imprimió 'Hola Mundo FINSO' legible y en negritas", Consola.PreguntarAsistente("¿Salió un ticket con \"Hola Mundo FINSO\" en negritas?"));
-            r.Criterio("El autocortador cortó el papel", Consola.PreguntarAsistente("¿El ticket salió cortado (suelto)?"));
         }
         finally { AutoReplyPrintSdk.Cerrar(h); }
     }
@@ -250,12 +244,6 @@ public static partial class HardwareTests
             ImpresoraRaw.Enviar(cfg.NombreImpresora, voucher);
             r.Criterio($"{voucher.Length} bytes entregados al spooler de '{cfg.NombreImpresora}'", true);
         }
-
-        r.Criterio("El asistente ve el logo de FINSO impreso arriba del ticket",
-            Consola.PreguntarAsistente("¿Se ve el logo de FINSO (letras azules + figura verde) arriba del ticket?"));
-        r.Criterio("El asistente ve los datos de la operación con formato de voucher tradicional (fecha, operación, montos, denominaciones, tipo de cambio, identificación, terminal y folio)",
-            Consola.PreguntarAsistente("¿El ticket muestra esos datos en líneas separadas, con separadores, como un comprobante normal?"));
-        r.Criterio("El autocortador cortó el papel", Consola.PreguntarAsistente("¿El ticket salió cortado (suelto)?"));
     }
 
     private static void ImprimirVoucherPorSdk(Reporte r, ImpresoraConfig cfg)
@@ -335,12 +323,6 @@ public static partial class HardwareTests
 
             var salioImpreso = AutoReplyPrintSdk.ConsultarResultadoImpresion(h, 3000);
             r.Criterio("El SDK confirma que el ticket se imprimió (QueryPrintResult)", salioImpreso);
-
-            r.Criterio("El asistente ve el logo de FINSO impreso arriba del ticket",
-                Consola.PreguntarAsistente("¿Se ve el logo de FINSO (letras azules + figura verde) arriba del ticket?"));
-            r.Criterio("El asistente ve los datos de la operación con formato de voucher tradicional (fecha, operación, montos, denominaciones, tipo de cambio, identificación, terminal y folio)",
-                Consola.PreguntarAsistente("¿El ticket muestra esos datos en líneas separadas, con separadores, como un comprobante normal?"));
-            r.Criterio("El autocortador cortó el papel", Consola.PreguntarAsistente("¿El ticket salió cortado (suelto)?"));
         }
         finally { AutoReplyPrintSdk.Cerrar(h); }
     }

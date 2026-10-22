@@ -15,6 +15,10 @@ internal static class Crm9250NExtra
     [DllImport("CRM9250NDev.dll", EntryPoint = "iGetCassetteInfoEx")]
     public static extern int iGetCassetteInfoEx(IntPtr p_hDevHandle, IntPtr p_psCassetteInfo, IntPtr p_psCassetteStatus, IntPtr p_psStatus);
 
+    /// <summary>Lee las monedas/denominaciones que soporta el validador NV (PDF §4.22). Sin efectos físicos.</summary>
+    [DllImport("CRM9250NDev.dll", EntryPoint = "iGetDenominationTable")]
+    public static extern int iGetDenominationTable(IntPtr p_hDevHandle, IntPtr p_psDenominationTable, IntPtr p_psStatus);
+
     /// <summary>Cierra la comunicación (PDF §4.4).</summary>
     [DllImport("CRM9250NDev.dll", EntryPoint = "iCloseComm")]
     public static extern int iCloseComm(IntPtr p_hDevHandle, IntPtr p_psStatus);
@@ -22,6 +26,24 @@ internal static class Crm9250NExtra
     /// <summary>Libera el handle; es el último paso (PDF §4.2).</summary>
     [DllImport("CRM9250NDev.dll", EntryPoint = "vCloseLogicDevice")]
     public static extern void vCloseLogicDevice(IntPtr p_hDevHandle);
+}
+
+/// <summary>tCRM9250N_DenominationInfo (PDF §3.17). wDenomCode = ID que espera awAcceptableDenom.</summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+internal struct tCRM9250N_DenominationInfo
+{
+    public ushort wDenomCode;
+    public ushort wLength;
+    public ushort wWidth;
+    public ushort wThickness;
+}
+
+/// <summary>tCRM9250N_DenominationTable (PDF §3.25).</summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+internal struct tCRM9250N_DenominationTable
+{
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 512)] public tCRM9250N_DenominationInfo[] asDenominationInfo;
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)] public byte[] abyReserved;
 }
 
 /// <summary>tCRM9250N_DevStatusEx de CRM9250NDevStruct.h (PDF §3.9). Pack = 1 como el resto de structs del SDK.</summary>

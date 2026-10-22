@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using CRM9250N_WinFormDemo;
 using IntegracionCajeroPruebas.Config;
 using IntegracionCajeroPruebas.Helpers;
@@ -10,6 +11,7 @@ public static partial class HardwareTests
 {
     private static IntPtr _crm = IntPtr.Zero;
     private static bool _reinicioMecanicoHecho;
+    private static bool _depositoPreparado;
     private static RecicladoraConfig Crm => HardwareConfig.Actual.Recicladora;
 
     /// <param name="reinicioMecanico">true = además ejecuta iPowerOnInitEx (la recicladora se mueve). Por defecto solo conecta y lee.</param>
@@ -40,72 +42,72 @@ public static partial class HardwareTests
         r.Finalizar();
     }
 
-    /// <param name="esperaRechazo">true = se inserta un billete inválido/no aceptado y se espera que la recicladora lo rechace.</param>
-    public static void Test_AceptarBilletes(bool esperaRechazo = false)
+    /// <summary>
+    /// Paso 1 de 2 del depósito manual (sin asistente: el dev ve todo por videollamada). Deja la recicladora
+    /// en modo depósito y abre el shutter para que el dev coloque los billetes a mano. Paso 2 es
+    /// <see cref="Test_DepositarEnCasetes"/>; si esa falla, el dev vuelve a llamar este método para recuperarlos.
+    /// </summary>
+    public static void Test_AbrirShutterDeposito()
     {
-        var r = new Reporte(esperaRechazo
-            ? "Recicladora GRG 9250N - Billete inválido (se espera rechazo)"
-            : "Recicladora GRG 9250N - Aceptar billetes");
+        var r = new Reporte("Recicladora GRG 9250N - Abrir shutter para depósito");
         try
         {
             if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
 
-            // Se pregunta antes de insertar: el asistente prepara los billetes y queda registrado cuáles eran.
-            // Según el demo del fabricante, el depósito real es por lote: se meten varios billetes juntos en
-            // la misma apertura y la máquina los lee, cuenta y enruta a sus casetes uno por uno internamente.
-            var billeteTexto = Consola.PreguntarTextoAsistente(esperaRechazo
-                ? "Tenga a la mano UN billete inválido (roto, fotocopia o de otra moneda). ¿Cuál es?"
-                : "Tenga a la mano los billetes que va a depositar juntos (uno o varios, pueden ser de distinta denominación). ¿Cuáles son? (separe por coma, ej. MXN 500, MXN 200, MXN 100)");
-            var billetes = billeteTexto.Split(',').Select(b => b.Trim()).Where(b => b.Length > 0).ToList();
-            var esperados = esperaRechazo ? 1 : Math.Max(billetes.Count, 1);
-            if (!r.Criterio("Asistente listo antes de abrir el shutter",
-                    Consola.AntesDeMover("se abrirá el shutter para recibir el/los billete(s)")))
-            { r.Finalizar(); return; }
+            using var s = new NativeScope();
+            var pStatus = s.Salida<tDevReturn>();
+            _depositoPreparado = CrmOk(r, "iPrepareDeposit", CRM9250N.iPrepareDeposit(_crm, pStatus), pStatus);
+            CrmOk(r, "iOpenShutter", CRM9250N.iOpenShutter(_crm, pStatus), pStatus);
+        }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
+    /// <summary>
+    /// Paso 2 de 2: con el shutter ya abierto y los billetes ya colocados a mano (Test_AbrirShutterDeposito),
+    /// cierra, cuenta y guarda en casetes. Si no se pudo depositar nada (0 contados), cancela la transacción
+    /// pero NO reabre el shutter: el dev lo hace manualmente con Test_AbrirShutterDeposito para recuperarlos.
+    /// </summary>
+    public static void Test_DepositarEnCasetes()
+    {
+        var r = new Reporte("Recicladora GRG 9250N - Depositar en casetes");
+        try
+        {
+            if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
 
             using var s = new NativeScope();
             var pStatus = s.Salida<tDevReturn>();
 
-            var listo = CrmOk(r, "iPrepareDeposit", CRM9250N.iPrepareDeposit(_crm, pStatus), pStatus)
-                     && CrmOk(r, "iOpenShutter", CRM9250N.iOpenShutter(_crm, pStatus), pStatus);
-            if (!listo) { r.Finalizar(); return; }
-
-            // R-06: rc=0 no prueba que el shutter se haya movido.
-            if (!r.Criterio("El asistente ve el shutter abierto", Consola.PreguntarAsistente("¿Ve el shutter abierto?")))
+            // Sin "Abrir shutter para depósito" en esta sesión (o tras un reinicio mecánico) la máquina no está en
+            // modo depósito. iPrepareDeposit no mueve nada, así que se manda aquí para no contar fuera de transacción.
+            if (!_depositoPreparado)
             {
-                CrmOk(r, "iCloseShutter", CRM9250N.iCloseShutter(_crm, pStatus), pStatus);
-                CrmOk(r, "iPrepareNextTransaction", CRM9250N.iPrepareNextTransaction(_crm, pStatus), pStatus);
-                r.Finalizar(); return;
+                Consola.Aviso("        No se corrió \"Abrir shutter para depósito\" antes: se prepara el depósito ahora.");
+                if (!CrmOk(r, "iPrepareDeposit", CRM9250N.iPrepareDeposit(_crm, pStatus), pStatus))
+                {
+                    // 26301: billetes en la ranura (p. ej. rechazados de un intento anterior). El depósito solo se
+                    // puede preparar con la ranura vacía, por eso el orden es: opción 2 primero y luego colocar.
+                    if (Native.Leer<tDevReturn>(pStatus).iLogicCode == 26301)
+                        Consola.Aviso("        Hay billetes en la ranura de un intento anterior. Ábrala con \"Abrir shutter\", " +
+                                      "retírelos, y luego: \"Abrir shutter para depósito\" -> colocar billetes -> \"Depositar en casetes\".");
+                    r.Finalizar(); return;
+                }
             }
+            _depositoPreparado = false;
 
-            Consola.Asistente($"Inserte junto(s), en la misma apertura, el/los billete(s) ({string.Join(" + ", billetes)}) en el shutter " +
-                              "y retire la mano por completo. Al decir \"listo\" el shutter SE CIERRA.");
-
-            var cerrado = CrmOk(r, "iCloseShutter", CRM9250N.iCloseShutter(_crm, pStatus), pStatus);
+            if (!CrmOk(r, "iCloseShutter", CRM9250N.iCloseShutter(_crm, pStatus), pStatus)) { r.Finalizar(); return; }
 
             var conteo = Native.Cero<tCRM9250N_CashCount>();
             conteo.iDepositLimit = Crm.LimiteDeposito;
             var pConteo = s.Entrada(conteo);
-            var contado = cerrado && CrmOk(r, "iCashCount", CRM9250N.iCashCount(_crm, pConteo, pStatus), pStatus);
-            if (!contado) { r.Finalizar(); return; }
+            if (!CrmOk(r, "iCashCount", CRM9250N.iCashCount(_crm, pConteo, pStatus), pStatus)) { r.Finalizar(); return; }
 
             var res = Native.Leer<tCRM9250N_CashCount>(pConteo);
             var detalle = $"total={res.iTotalCount} rechazados={res.iRejectCount} desconocidos={res.sDenomNumInfo.iUnknownCount}";
-            if (esperaRechazo)
-                r.Criterio("El billete inválido fue rechazado (rechazados ≥ 1 y ninguno contado)",
-                    res.iRejectCount >= 1 && res.iTotalCount == 0, detalle);
-            else
-                // La máquina enruta cada billete a su casete internamente; aquí solo se puede verificar
-                // que contó tantos billetes como se insertaron (no a cuál casete fue cada uno).
-                r.Criterio($"Se contaron los {esperados} billete(s) esperados (según lo declarado por el asistente)",
-                    res.iTotalCount == esperados, detalle);
             ImprimirDenominaciones(res.sDenomNumInfo);
-            Consola.Info($"        Billete(s) insertado(s) (según el asistente): {(billetes.Count > 0 ? string.Join(" + ", billetes) : "sin dato")}");
-            if (!esperaRechazo && res.iTotalCount > 0 && billetes.Count > 0)
-                Consola.Aviso("        EVIDENCIA: comparar el desglose por código de arriba contra los billetes declarados y " +
-                              "asociar cada código a su denominación en Recicladora.EtiquetaDenominacion (hardware.json)");
+            if (res.iRejectCount > 0) ImprimirMotivosRechazo();
 
-            // Con billetes contados: guardarlos (confirma el depósito) o devolverlos al usuario.
-            if (res.iTotalCount > 0 && Consola.Confirmar("¿Guardar los billetes en la recicladora (iStoreMoneyEx)? n = devolver"))
+            if (res.iTotalCount > 0)
             {
                 var store = Native.Cero<tCRM9250N_StoreMoneyEx>();
                 store.byRejectPos = Crm.DestinoRechazoDeposito;
@@ -113,23 +115,22 @@ public static partial class HardwareTests
                 // Prioridad 1..4 para RC1..RC4 (0x01-0x0F, menor = más prioridad), como en la demo de GRG.
                 for (var i = 0; i < 4; i++) store.abyCassettePriority[i] = (byte)(i + 1);
                 var pStore = s.Entrada(store);
-                if (CrmOk(r, "iStoreMoneyEx", CRM9250N.iStoreMoneyEx(_crm, pStore, pStatus), pStatus))
-                    r.Criterio("El asistente confirma que el/los billete(s) entraron (shutter vacío)",
-                        Consola.PreguntarAsistente("¿El shutter quedó vacío (el/los billete(s) entraron a la máquina)?"));
+                CrmOk(r, $"iStoreMoneyEx: depósito de {res.iTotalCount} billete(s)", CRM9250N.iStoreMoneyEx(_crm, pStore, pStatus), pStatus);
             }
             else
             {
-                Consola.Asistente("El shutter se abrirá para devolver el/los billete(s). Mantenga las manos fuera y diga \"listo\".");
                 var cancel = Native.Cero<tCRM9250N_CancelDepositEx>();
                 var pCancel = s.Entrada(cancel);
                 CrmOk(r, "iCancelDepositEx", CRM9250N.iCancelDepositEx(_crm, pCancel, pStatus), pStatus);
-                // Se insertaron "esperados" billetes: deben volver todos, contados o rechazados.
-                var devueltos = Consola.PreguntarNumeroAsistente("Retire lo que haya en el shutter. ¿Cuántos billetes retiró?");
-                r.Criterio($"El asistente recuperó los {esperados} billete(s) insertados", devueltos == esperados,
-                    $"devueltos según el asistente={devueltos?.ToString() ?? "sin respuesta"}");
+                if (res.iRejectCount == 0)
+                    // logic 25113 "No note is in input slot": no hubo nada que depositar, no es falla de la máquina.
+                    Consola.Aviso($"        No había billetes en la ranura ({detalle}). Corra primero \"Abrir shutter para depósito\" " +
+                                  "y coloque los billetes antes de \"Depositar en casetes\".");
+                else
+                    r.Criterio("Depósito realizado (se contó al menos 1 billete)", false,
+                        $"{detalle} — la máquina rechazó los billetes; abrir el shutter (Abrir shutter para depósito) para recuperarlos");
             }
 
-            Consola.Asistente("Manos fuera del shutter: puede cerrarse. Diga \"listo\".");
             CrmOk(r, "iPrepareNextTransaction", CRM9250N.iPrepareNextTransaction(_crm, pStatus), pStatus);
         }
         catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
@@ -190,16 +191,20 @@ public static partial class HardwareTests
                 Evento($"Pedido: {cantidad}x {cassette.Nombre} ({cassette.Moneda} {cassette.Denominacion}), índice SDK {cassette.Indice}");
 
             if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
-            if (!r.Criterio("Asistente listo antes de dispensar", Consola.AntesDeMover(
-                    $"se dispensarán {resumen} y se abrirá el shutter")))
-            { r.Finalizar(); return; }
+            if (!HayBilletesParaDispensar(renglones)) { r.Finalizar(); return; }
+            Consola.Aviso($"  >> El dispositivo recibió la orden: dispensar {resumen} y abrir el shutter");
 
+            // Flujo recomendado por GRG (PDF §5.2): iPrepareNextTransaction -> iDispenseEx -> si falla, iInitEx hasta
+            // N veces y luego mantenimiento; si sale bien, iOpenShutter y sondeo de iGetDevStatusEx hasta que retiren
+            // los billetes o se agote el tiempo -> iCloseShutter -> iGetDevStatusEx -> iRetractEx si quedó algo en NF/NE.
             using var s = new NativeScope();
             var pStatus = s.Salida<tDevReturn>();
 
-            Evento("iPrepareDispense: solicitando");
-            if (!CrmOk(r, "iPrepareDispense", CRM9250N.iPrepareDispense(_crm, pStatus), pStatus))
-            { r.Finalizar(); return; }
+            Paso("INICIO del flujo de dispensa de GRG");
+            Paso($"Modo de validación de billetes: {Crm.ModoValidacionBilletes} ({NombreModoValidacion(Crm.ModoValidacionBilletes)})");
+            Paso("iPrepareNextTransaction: preparar la transacción");
+            if (!CrmOk(r, "iPrepareNextTransaction", CRM9250N.iPrepareNextTransaction(_crm, pStatus), pStatus))
+            { Paso("FIN: no se pudo preparar la transacción"); r.Finalizar(); return; }
 
             var disp = Native.Cero<tCRM9250N_DispenseInfoEx>();
             disp.byDispType = Crm.TipoDispensa;
@@ -209,8 +214,10 @@ public static partial class HardwareTests
                 { wDenomOrCassetteInfo = (ushort)renglones[i].Cassette.Indice, iNum = renglones[i].Cantidad };
             var pDisp = s.Entrada(disp);
 
-            Evento($"iDispenseEx: solicitando {resumen} (orden única, {renglones.Count} casete(s))");
+            Paso($"iDispenseEx: dispensar {resumen} (orden única, {renglones.Count} casete(s))");
             var ok = CrmOk(r, "iDispenseEx", CRM9250N.iDispenseEx(_crm, pDisp, pStatus), pStatus);
+            Paso(ok ? "¿Dispensa correcta? SÍ -> abrir shutter y esperar el retiro"
+                    : "¿Dispensa correcta? NO -> no se abre el shutter; recuperación con reinicio (iInitEx)");
 
             var dispensadoTotal = 0;
             if (ok)
@@ -231,33 +238,64 @@ public static partial class HardwareTests
                     r.Criterio($"Casete {cassette.Nombre} ({cassette.Moneda} {cassette.Denominacion}): {cantidad} pedido(s), {d} dispensado(s)",
                         d == cantidad, $"rechazados={rj}");
                 }
-            }
-
-            // No se asume que iDispenseEx abra el shutter por sí solo: se ordena explícitamente (VERIFICAR en el
-            // primer ciclo físico si ya estaba abierto o si esta llamada es la que lo mueve).
-            Evento("iOpenShutter: solicitando (para que el cliente retire todo junto)");
-            CrmOk(r, "iOpenShutter", CRM9250N.iOpenShutter(_crm, pStatus), pStatus);
-
-            // Se pregunta también si iDispenseEx falló, para detectar una dispensa parcial (R-15).
-            // Se pide el número, no un sí/no sobre el esperado, para no inducir la respuesta.
-            var esperados = ok ? totalPedido : 0;
-            var vistos = Consola.PreguntarNumeroAsistente("Sin tocarlos todavía: ¿cuántos billetes hay en el shutter en total?");
-            Evento($"Asistente reporta {vistos?.ToString() ?? "sin respuesta"} billete(s) en el shutter (esperados={esperados})");
-            r.Criterio($"El asistente cuenta {esperados} billete(s) en el shutter", vistos == esperados,
-                $"asistente={vistos?.ToString() ?? "sin respuesta"} total reportado por la recicladora={dispensadoTotal}");
-
-            if (vistos > 0)
-            {
-                foreach (var (cassette, cantidad) in renglones)
+                if (rechazadoTotal > 0)
                 {
-                    var vistosDenom = Consola.PreguntarNumeroAsistente($"¿Cuántos billetes de {cassette.Moneda} {cassette.Denominacion} ve?");
-                    r.Criterio($"El asistente ve {cantidad} billete(s) de {cassette.Moneda} {cassette.Denominacion}",
-                        vistosDenom == cantidad, $"asistente={vistosDenom?.ToString() ?? "sin respuesta"}");
+                    Paso($"iGetNvNotesInfoEx (opcional): hubo {rechazadoTotal} rechazo(s), se consulta el detalle del NV");
+                    ImprimirMotivosRechazo();
                 }
-                Consola.Asistente("Retire todos los billetes y la mano del shutter. Al decir \"listo\" el shutter puede cerrarse.");
+                else Paso("iGetNvNotesInfoEx (opcional): omitido, no hubo rechazos");
+
+                Paso("iOpenShutter: abrir para que se retiren los billetes");
+                if (CrmOk(r, "iOpenShutter", CRM9250N.iOpenShutter(_crm, pStatus), pStatus))
+                    EsperarRetiroDeBilletes(r);
+                else Paso("El shutter no abrió: se pasa directo a cerrar y recoger");
+            }
+            else
+            {
+                // Con la dispensa fallida no se abre el shutter (antes se abría vacío): se intenta recuperar la máquina.
+                if (!RecuperarTrasFalla(r))
+                    Paso($"No volvió a la normalidad tras {Crm.IntentosRecuperacion} reinicio(s) -> MANTENIMIENTO FUERA DE LÍNEA " +
+                         "(revisar atascos/casetes con el técnico)");
             }
 
-            Evento("iCloseShutter: solicitando");
+            CerrarYRecogerRemanentes(r);
+            Paso("FIN del flujo de dispensa");
+        }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
+    /// <summary>Control manual del shutter, independiente del flujo de aceptar/dispensar. Sirve para diagnosticar
+    /// si ya está abierto/cerrado antes de asumir que otro comando (ej. iDispenseEx) lo mueve por su cuenta, y
+    /// también como paso final tras depositar o dispensar (el dev lo invoca cuando ya retiró/colocó los billetes).</summary>
+    public static void Test_AbrirShutter()
+    {
+        var r = new Reporte("Recicladora GRG 9250N - Abrir shutter (control manual)");
+        try
+        {
+            if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
+
+            using var s = new NativeScope();
+            var pStatus = s.Salida<tDevReturn>();
+            Evento("iOpenShutter: solicitando (manual)");
+            CrmOk(r, "iOpenShutter", CRM9250N.iOpenShutter(_crm, pStatus), pStatus);
+        }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
+    /// <summary>Contraparte de <see cref="Test_AbrirShutter"/>: cierra el shutter y prepara la siguiente transacción.
+    /// Úsala cuando ya hayas retirado los billetes (tras dispensar) o colocado los que vas a depositar.</summary>
+    public static void Test_CerrarShutter()
+    {
+        var r = new Reporte("Recicladora GRG 9250N - Cerrar shutter (control manual)");
+        try
+        {
+            if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
+
+            using var s = new NativeScope();
+            var pStatus = s.Salida<tDevReturn>();
+            Evento("iCloseShutter: solicitando (manual)");
             CrmOk(r, "iCloseShutter", CRM9250N.iCloseShutter(_crm, pStatus), pStatus);
             Evento("iPrepareNextTransaction: solicitando");
             CrmOk(r, "iPrepareNextTransaction", CRM9250N.iPrepareNextTransaction(_crm, pStatus), pStatus);
@@ -266,49 +304,86 @@ public static partial class HardwareTests
         r.Finalizar();
     }
 
-    /// <summary>Control manual del shutter, independiente del flujo de aceptar/dispensar. Sirve para diagnosticar
-    /// si ya está abierto/cerrado antes de asumir que otro comando (ej. iDispenseEx) lo mueve por su cuenta.</summary>
-    public static void Test_AbrirShutter()
+    /// <summary>
+    /// Consulta de solo lectura (no mueve nada): presencia/estado por casete (iGetCassetteInfoEx) cruzado con la
+    /// denominación configurada en hardware.json. El SDK no expone un conteo de billetes en vivo por casete (solo
+    /// presencia/estado); para el inventario real hay que conciliar contra los contadores de depósito/dispensa
+    /// (ver Test_AceptarBilletes/Test_DispensarBilletes) y el conteo físico del asistente.
+    /// </summary>
+    public static void Test_ConsultarInventario()
     {
-        var r = new Reporte("Recicladora GRG 9250N - Abrir shutter (control manual)");
+        var r = new Reporte("Recicladora GRG 9250N - Consultar inventario (solo lectura)");
         try
         {
-            if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
-            if (!r.Criterio("Asistente listo antes de abrir el shutter", Consola.AntesDeMover("se abrirá el shutter")))
-            { r.Finalizar(); return; }
+            if (_crm == IntPtr.Zero && !InicializarRecicladora(r)) { r.Finalizar(); return; }
 
             using var s = new NativeScope();
             var pStatus = s.Salida<tDevReturn>();
-            Evento("iOpenShutter: solicitando (manual)");
-            CrmOk(r, "iOpenShutter", CRM9250N.iOpenShutter(_crm, pStatus), pStatus);
-            r.Criterio("El asistente ve el shutter abierto", Consola.PreguntarAsistente("¿Ve el shutter abierto?"));
-        }
-        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
-        r.Finalizar();
-    }
-
-    /// <summary>Contraparte de <see cref="Test_AbrirShutter"/>: cierra el shutter sin pasar por depósito ni dispensa.</summary>
-    public static void Test_CerrarShutter()
-    {
-        var r = new Reporte("Recicladora GRG 9250N - Cerrar shutter (control manual)");
-        try
-        {
-            if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
-            if (!r.Criterio("Asistente listo antes de cerrar el shutter",
-                    Consola.AntesDeMover("se cerrará el shutter: manos y billetes fuera")))
+            var pCasetes = s.Salida<tCRM9250N_CassetteInfoEx>();
+            var pEstado = s.Salida<tCRM9250N_CassetteStatusEx>();
+            if (!CrmOk(r, "iGetCassetteInfoEx", Crm9250NExtra.iGetCassetteInfoEx(_crm, pCasetes, pEstado, pStatus), pStatus))
             { r.Finalizar(); return; }
 
-            using var s = new NativeScope();
-            var pStatus = s.Salida<tDevReturn>();
-            Evento("iCloseShutter: solicitando (manual)");
-            CrmOk(r, "iCloseShutter", CRM9250N.iCloseShutter(_crm, pStatus), pStatus);
-            r.Criterio("El asistente ve el shutter cerrado", Consola.PreguntarAsistente("¿Ve el shutter cerrado?"));
+            var estado = Native.Leer<tCRM9250N_CassetteStatusEx>(pEstado);
+            foreach (var cassette in Crm.Casetes.OrderBy(c => c.Indice))
+            {
+                var idx = cassette.Indice - 1;
+                if (idx < 0 || idx >= estado.asRcStatus.Length)
+                {
+                    Consola.Aviso($"        {cassette.Nombre} ({cassette.Moneda} {cassette.Denominacion}): índice {cassette.Indice} fuera de rango SDK");
+                    continue;
+                }
+                var bin = estado.asRcStatus[idx];
+                Consola.Info($"        RC{cassette.Indice} {cassette.Nombre} ({cassette.Moneda} {cassette.Denominacion}): " +
+                             $"presente={bin.byExist} status={bin.byStatus}");
+            }
+            Consola.Aviso("        El SDK no reporta cantidad de billetes por casete en esta llamada; " +
+                          "confirmar conteo físico visualmente si se requiere inventario exacto.");
         }
         catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
         r.Finalizar();
     }
 
     // ------------------------------------------------------------------ helpers
+
+    // byStatus de tCRM9250N_BinStatus (API GRG §3.8): 0 normal, 1 lleno, 2 casi lleno, 3 casi vacío, 4 vacío, 255 anormal.
+    // Un casete vacío no es falla de la prueba: se avisa y no se manda la orden de dispensa.
+    private static bool HayBilletesParaDispensar(List<(CaseteConfig Cassette, int Cantidad)> renglones)
+    {
+        using var s = new NativeScope();
+        var pStatus = s.Salida<tDevReturn>();
+        var pCasetes = s.Salida<tCRM9250N_CassetteInfoEx>();
+        var pEstado = s.Salida<tCRM9250N_CassetteStatusEx>();
+        var rc = Crm9250NExtra.iGetCassetteInfoEx(_crm, pCasetes, pEstado, pStatus);
+        if (rc != Crm.CodigoExito)
+        {
+            Consola.Aviso($"        No se pudo leer el estado de los casetes (rc={rc}); se intenta dispensar de todos modos.");
+            return true;
+        }
+
+        var estado = Native.Leer<tCRM9250N_CassetteStatusEx>(pEstado);
+        var hay = true;
+        foreach (var (cassette, _) in renglones)
+        {
+            var bin = estado.asRcStatus[cassette.Indice - 1];
+            var etiqueta = $"{cassette.Nombre} ({cassette.Moneda} {cassette.Denominacion})";
+            switch (bin.byStatus)
+            {
+                case 4:
+                    Consola.Aviso($"        No hay billetes en {etiqueta}: el casete reporta vacío. Rellenarlo antes de dispensar.");
+                    hay = false;
+                    break;
+                case 255:
+                    Consola.Aviso($"        {etiqueta} reporta estado anormal (255): revisar el casete antes de dispensar.");
+                    hay = false;
+                    break;
+                case 3:
+                    Consola.Aviso($"        {etiqueta} reporta casi vacío: puede no alcanzar para lo pedido.");
+                    break;
+            }
+        }
+        return hay;
+    }
 
     // Conecta sin mover y, una sola vez por sesión, hace el reinicio mecánico que recomienda el SDK antes de operar billetes.
     private static bool AsegurarRecicladora(Reporte r)
@@ -340,6 +415,7 @@ public static partial class HardwareTests
         CerrarRecicladora(); // reconectar desde cero si ya había un handle abierto
         _reinicioMecanicoHecho = false;
         if (!DiagnosticarDllRecicladora(r)) return false;
+        AplicarModoValidacionBilletes();
 
         _crm = CRM9250N.hOpenLogicDevice(Crm.NombreDispositivoLogico);
         if (!r.Criterio($"hOpenLogicDevice('{Crm.NombreDispositivoLogico}') devuelve handle", _crm != IntPtr.Zero,
@@ -373,20 +449,19 @@ public static partial class HardwareTests
             var d = Native.Leer<tCRM9250N_DevStatusEx>(pDev);
             Consola.Info($"        Estado: shutter abierto={d.byShutterOpen} billetes en shutter={d.byShutterAreaHasNotes} " +
                          $"billetes en NF={d.byNfHasNotes} billetes en NE={d.byNeHasNotes} casete extraído={d.byCassettePlugRemove}");
-            Consola.Info($"        Casetes extraídos: RC1={d.byRC1PlugRemove} RC2={d.byRC2PlugRemove} RC3={d.byRC3PlugRemove} RC4={d.byRC4PlugRemove}");
+            Consola.Info($"        Casetes extraídos: RC1={d.byRC1PlugRemove} RC2={d.byRC2PlugRemove} RC3={d.byRC3PlugRemove} RC4={d.byRC4PlugRemove} " +
+                         $"AC(rechazos)={d.byACPlugRemove} ATC={d.byATCPlugRemove}");
         }
         return true;
     }
 
     /// <summary>
     /// iPowerOnInitEx: reinicio mecánico. Pasa el transporte a su posición inicial y manda al NF los billetes que haya en el canal
-    /// (PDF §4.6). Pide confirmación al asistente antes de ejecutarlo.
+    /// (PDF §4.6). El dev ve el movimiento directo por videollamada: no se pide confirmación, solo se avisa.
     /// </summary>
     private static bool ReiniciarMecanicamenteRecicladora(Reporte r)
     {
-        if (!r.Criterio("Asistente listo antes del reinicio mecánico",
-                Consola.AntesDeMover("la recicladora se reinicia (ruido de motores; el shutter y el transporte se mueven)")))
-            return false;
+        Consola.Aviso("  >> El dispositivo recibió la orden: reinicio mecánico (ruido de motores; el shutter y el transporte se mueven)");
 
         using var s = new NativeScope();
         var pStatus = s.Salida<tDevReturn>();
@@ -395,6 +470,9 @@ public static partial class HardwareTests
         cfg.byWorkingMode = Crm.ModoTrabajo;
         cfg.byDcAccepetAllDenom = Crm.AceptarTodasDenominaciones;
         cfg.byInitCfg = Crm.ConfigInicio;
+        // PDF §3.2: awAcceptableDenom "empty: all not accepted". Con la lista en ceros el NV rechaza todo
+        // (visto el 2026-10-21: 18 rechazados, logic 25119). Se llena con lo que el propio NV dice soportar.
+        LlenarDenominacionesAceptadas(cfg.awAcceptableDenom);
         var pCfg = s.Entrada(cfg);
         var pCasetes = s.Salida<tCRM9250N_CassetteInfoEx>();
         var pEstado = s.Salida<tCRM9250N_CassetteStatusEx>();
@@ -403,8 +481,162 @@ public static partial class HardwareTests
         if (!CrmOk(r, "iPowerOnInitEx", CRM9250N.iPowerOnInitEx(_crm, pCfg, pCasetes, pEstado, pInit, pStatus), pStatus))
             return false;
         _reinicioMecanicoHecho = true;
+        _depositoPreparado = false;
         ListarCasetes(Native.Leer<tCRM9250N_CassetteStatusEx>(pEstado));
         return true;
+    }
+
+    private static string NombreModoValidacion(int modo) =>
+        modo switch { 0 => "billete real", 15 => "billete simulado", 255 => "billete de prueba", _ => "desconocido" };
+
+    // Escribe NOTEVALIDMODE en el CRM9250NDevCfg.ini junto al .exe antes de hOpenLogicDevice (el SDK lo lee al conectar).
+    // El .ini está en GBK: se edita byte a byte con Latin1 para no tocar los comentarios en chino.
+    private static void AplicarModoValidacionBilletes()
+    {
+        var ini = Path.Combine(AppContext.BaseDirectory, "CRM9250NDevCfg.ini");
+        var modo = Crm.ModoValidacionBilletes;
+        try
+        {
+            var texto = File.ReadAllText(ini, System.Text.Encoding.Latin1);
+            var actual = System.Text.RegularExpressions.Regex.Match(texto, @"(?m)^NOTEVALIDMODE=(\d+)");
+            if (!actual.Success)
+            {
+                Consola.Aviso($"        {ini} no tiene NOTEVALIDMODE: el SDK usará su valor por defecto.");
+                return;
+            }
+            if (actual.Groups[1].Value != modo.ToString())
+            {
+                texto = texto.Remove(actual.Index, actual.Length).Insert(actual.Index, $"NOTEVALIDMODE={modo}");
+                File.WriteAllText(ini, texto, System.Text.Encoding.Latin1);
+            }
+            Consola.Info($"        Modo de validación de billetes del SDK: {modo} ({NombreModoValidacion(modo)})" +
+                         (modo != 0 ? " — SOLO PRUEBAS; en producción debe ser 0" : ""));
+        }
+        catch (Exception ex)
+        {
+            Consola.Aviso($"        No se pudo aplicar NOTEVALIDMODE={modo} en {ini}: {ex.Message}");
+        }
+    }
+
+    private static tCRM9250N_DevStatusEx? LeerEstadoDispositivo()
+    {
+        using var s = new NativeScope();
+        var pStatus = s.Salida<tDevReturn>();
+        var pDev = s.Salida<tCRM9250N_DevStatusEx>();
+        return Crm9250NExtra.iGetDevStatusEx(_crm, pDev, pStatus) == Crm.CodigoExito
+            ? Native.Leer<tCRM9250N_DevStatusEx>(pDev) : null;
+    }
+
+    // Sondeo periódico de iGetDevStatusEx hasta que el NF/shutter quede sin billetes o se agote el tiempo.
+    private static void EsperarRetiroDeBilletes(Reporte r)
+    {
+        Paso($"iGetDevStatusEx (sondeo cada 500 ms): esperando el retiro, máx. {Crm.SegundosRetiroBilletes} s");
+        Consola.Aviso("  >> Shutter abierto: retire los billetes");
+        var inicio = DateTime.UtcNow;
+        var limite = inicio.AddSeconds(Crm.SegundosRetiroBilletes);
+        var proximoReporte = inicio.AddSeconds(5);
+        var lecturasFallidas = 0;
+        while (DateTime.UtcNow < limite)
+        {
+            var d = LeerEstadoDispositivo();
+            if (d is null) lecturasFallidas++;
+            else if (d.Value.byNfHasNotes == 0 && d.Value.byShutterAreaHasNotes == 0)
+            {
+                Paso($"¿Se retiraron los billetes? SÍ (a los {(DateTime.UtcNow - inicio).TotalSeconds:0} s) -> cerrar shutter");
+                r.Criterio("Billetes retirados del shutter antes del tiempo límite", true);
+                return;
+            }
+            if (DateTime.UtcNow >= proximoReporte)
+            {
+                var restante = (limite - DateTime.UtcNow).TotalSeconds;
+                Evento(d is null
+                    ? $"Esperando retiro... sin lectura de estado (fallidas={lecturasFallidas}), quedan {restante:0} s"
+                    : $"Esperando retiro... NF={d.Value.byNfHasNotes} shutter={d.Value.byShutterAreaHasNotes}, quedan {restante:0} s");
+                proximoReporte = proximoReporte.AddSeconds(5);
+            }
+            Thread.Sleep(500);
+        }
+        Paso($"¿Se retiraron los billetes? NO, tiempo agotado ({Crm.SegundosRetiroBilletes} s) -> cerrar shutter y recoger");
+        r.Criterio("Billetes retirados del shutter antes del tiempo límite", false,
+            $"tiempo agotado ({Crm.SegundosRetiroBilletes} s); lecturas de estado fallidas={lecturasFallidas}. " +
+            "Se cierra el shutter y se recoge lo que quede.");
+    }
+
+    // "iInitEx hasta N veces": iPowerOnInitEx ya incluye iInitEx (PDF §4.6) y además rearma la lista de denominaciones.
+    private static bool RecuperarTrasFalla(Reporte r)
+    {
+        for (var intento = 1; intento <= Crm.IntentosRecuperacion; intento++)
+        {
+            Paso($"iInitEx (vía iPowerOnInitEx): reinicio de recuperación {intento} de {Crm.IntentosRecuperacion}");
+            if (ReiniciarMecanicamenteRecicladora(r))
+            {
+                Paso("¿Volvió a la normalidad? SÍ -> cerrar shutter");
+                return true;
+            }
+            Paso(intento < Crm.IntentosRecuperacion
+                ? "¿Volvió a la normalidad? NO -> se reintenta"
+                : "¿Volvió a la normalidad? NO -> sin más reintentos");
+        }
+        return false;
+    }
+
+    // Cierre común del flujo: iCloseShutter -> iGetDevStatusEx -> iRetractEx (NF y/o NE) si quedaron billetes.
+    private static void CerrarYRecogerRemanentes(Reporte r)
+    {
+        using var s = new NativeScope();
+        var pStatus = s.Salida<tDevReturn>();
+        Paso("iCloseShutter: cerrar el shutter");
+        CrmOk(r, "iCloseShutter", CRM9250N.iCloseShutter(_crm, pStatus), pStatus);
+
+        Paso("iGetDevStatusEx: revisar si quedaron billetes en NF/NE");
+        var d = LeerEstadoDispositivo();
+        if (d is null)
+        {
+            Consola.Aviso("        No se pudo leer el estado tras cerrar el shutter (iGetDevStatusEx): no se verifica si quedaron billetes.");
+            return;
+        }
+        Consola.Info($"        Estado tras cerrar: billetes en NF={d.Value.byNfHasNotes} en NE={d.Value.byNeHasNotes} " +
+                     $"en shutter={d.Value.byShutterAreaHasNotes}");
+        var quedan = d.Value.byNfHasNotes != 0 || d.Value.byNeHasNotes != 0;
+        Paso(quedan ? "¿Quedan billetes en NF/NE? SÍ -> iRetractEx" : "¿Quedan billetes en NF/NE? NO -> no se requiere iRetractEx");
+
+        foreach (var (tipo, zona, hay) in new[] { ((byte)1, "NF", d.Value.byNfHasNotes != 0), ((byte)2, "NE", d.Value.byNeHasNotes != 0) })
+        {
+            if (!hay) continue;
+            var ret = Native.Cero<tCRM9250N_RetractInfoEx>();
+            ret.byRetractType = tipo;
+            ret.byRetractPos = Crm.DestinoRetract;
+            for (var i = 0; i < 4; i++) ret.abyCassettePriority[i] = (byte)(i + 1);
+            var pRet = s.Entrada(ret);
+            Paso($"iRetractEx: recoger billetes de {zona} (destino {Crm.DestinoRetract})");
+            if (CrmOk(r, $"iRetractEx {zona}", CRM9250N.iRetractEx(_crm, pRet, pStatus), pStatus))
+                Consola.Info($"        Recogidos de {zona}: {Native.Leer<tCRM9250N_RetractInfoEx>(pRet).iTotalCount} billete(s) (conteo aproximado según SDK)");
+        }
+    }
+
+    private static void LlenarDenominacionesAceptadas(ushort[] destino)
+    {
+        using var s = new NativeScope();
+        var pStatus = s.Salida<tDevReturn>();
+        var pTabla = s.Salida<tCRM9250N_DenominationTable>();
+        var rc = Crm9250NExtra.iGetDenominationTable(_crm, pTabla, pStatus);
+        if (rc != Crm.CodigoExito)
+        {
+            var st = Native.Leer<tDevReturn>(pStatus);
+            Consola.Aviso($"        iGetDenominationTable falló (rc={rc} logic={st.iLogicCode} {CodigosGrg.Describir(st.iLogicCode)}): " +
+                          "la lista de denominaciones aceptadas queda vacía y el NV puede rechazar todos los billetes.");
+            return;
+        }
+
+        var soportadas = Native.Leer<tCRM9250N_DenominationTable>(pTabla).asDenominationInfo
+            .Where(d => d.wDenomCode != 0).Take(destino.Length).ToList();
+        for (var i = 0; i < soportadas.Count; i++) destino[i] = soportadas[i].wDenomCode;
+
+        Consola.Info($"        Denominaciones que soporta el NV: {soportadas.Count}");
+        foreach (var d in soportadas)
+            Consola.Info($"          ID {d.wDenomCode} (0x{d.wDenomCode:X4}): {d.wLength}x{d.wWidth} mm, grosor {d.wThickness}");
+        if (soportadas.Count == 0)
+            Consola.Aviso("        El NV no reporta ninguna denominación: no tiene plantillas cargadas y rechazará todo billete.");
     }
 
     private static void ListarCasetes(tCRM9250N_CassetteStatusEx estado)
@@ -417,6 +649,9 @@ public static partial class HardwareTests
     /// <summary>Línea de bitácora con timestamp para reconstruir la secuencia de eventos físicos/SDK de la dispensa.</summary>
     private static void Evento(string texto) => Consola.Info($"        {DateTime.Now:HH:mm:ss.fff} {texto}");
 
+    /// <summary>Paso o decisión del flujo recomendado por GRG, resaltado para seguirlo en consola durante la videollamada.</summary>
+    private static void Paso(string texto) => Consola.Paso($"  [Flujo] {DateTime.Now:HH:mm:ss} {texto}");
+
     private static bool CrmOk(Reporte r, string funcion, int rc, IntPtr pStatus)
     {
         var st = Native.Leer<tDevReturn>(pStatus);
@@ -424,6 +659,39 @@ public static partial class HardwareTests
         return r.Criterio($"{funcion} (rc={rc})", rc == Crm.CodigoExito,
             $"logic={st.iLogicCode} phy={st.iPhyCode} tipo={st.iType} msg='{Native.Texto(st.acDevReturn)}'" +
             (significado.Length > 0 ? $" | {significado}" : ""));
+    }
+
+    // PDF §4.24 iGetNvNotesInfoEx: detalle por billete del último conteo. wDenomination=0 = el NV no lo reconoció;
+    // abyRejectErrCode/abyInfoErrCode son los códigos crudos del NV (sin tabla pública: se pasan tal cual a GRG).
+    private static void ImprimirMotivosRechazo()
+    {
+        const int maxNotas = 200;
+        var tamDetalle = Marshal.SizeOf<tGRGNoteDetails>();
+        var tamOcr = Marshal.SizeOf<tGRGNoteOCRInfo>();
+        using var s = new NativeScope();
+        var pStatus = s.Salida<tDevReturn>();
+        var pDetalles = s.Bloque(tamDetalle * maxNotas);
+        var pOcr = s.Bloque(tamOcr * maxNotas);
+        var n = maxNotas;
+        var fsn = new byte[260];
+
+        var rc = CRM9250N.iGetNvNotesInfoEx(_crm, pDetalles, pOcr, ref n, 0x03, fsn, pStatus);
+        if (rc != Crm.CodigoExito)
+        {
+            var st = Native.Leer<tDevReturn>(pStatus);
+            Consola.Aviso($"        iGetNvNotesInfoEx no dio el detalle de los billetes (rc={rc} logic={st.iLogicCode} {CodigosGrg.Describir(st.iLogicCode)}).");
+            return;
+        }
+
+        Consola.Info($"        Detalle del NV por billete ({n}):");
+        for (var i = 0; i < Math.Min(n, maxNotas); i++)
+        {
+            var d = Marshal.PtrToStructure<tGRGNoteDetails>(pDetalles + i * tamDetalle);
+            var o = Marshal.PtrToStructure<tGRGNoteOCRInfo>(pOcr + i * tamOcr);
+            Consola.Info($"          #{d.wNoteIndex}: denom={d.wDenomination} (0x{d.wDenomination:X4}) " +
+                         $"validación={d.byValidation} (0=real) cara={d.byFaceWay} destino={d.sNoteGoDest.iType} " +
+                         $"errInfo={Consola.Hex(o.abyInfoErrCode)} errRechazo={Consola.Hex(o.abyRejectErrCode)}");
+        }
     }
 
     private static void ImprimirDenominaciones(tCRM9250N_DenomNumInfo info)

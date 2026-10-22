@@ -58,6 +58,14 @@ public sealed class NativeScope : IDisposable
         return p;
     }
 
+    /// <summary>Buffer en cero de tamaño libre (arreglos de structs de salida), con la misma holgura.</summary>
+    public IntPtr Bloque(int bytes)
+    {
+        var p = Native.AsignarCero(bytes * Holgura);
+        _punteros.Add(p);
+        return p;
+    }
+
     public void Dispose()
     {
         foreach (var p in _punteros) Marshal.FreeHGlobal(p);
