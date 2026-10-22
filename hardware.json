@@ -14,6 +14,9 @@
     "DestinoRechazoDeposito": 1,              // byRejectPos: 1 = AC1, 2 = AC2, 3 = LRB
     "MaxBilletesPrueba": 5,
     "SegundosRetiroBilletes": 60,             // espera a que retiren lo dispensado; luego cierra el shutter solo
+    "SegundosColocarBilletes": 60,            // depósito: espera a que coloquen billetes tras abrir el shutter
+    "SegundosAcomodoBilletes": 3,             // depósito: margen tras detectar billetes antes de cerrar
+    "MaxLotesDeposito": 10,                   // depósito: tope de conteos por transacción (LimiteDeposito = billetes por conteo)
     "DestinoRetract": 2,                      // byRetractPos de iRetractEx: 1 = LRB, 2 = AC, 3 = NE
     "IntentosRecuperacion": 3,                // reinicios tras dispensa fallida antes de pedir mantenimiento
     "ModoValidacionBilletes": 0,              // NOTEVALIDMODE del SDK: 0 = billete real (PRODUCCIÓN), 15 = billete simulado (pruebas)

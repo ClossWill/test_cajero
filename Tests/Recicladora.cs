@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using CRM9250N_WinFormDemo;
 using IntegracionCajeroPruebas.Config;
 using IntegracionCajeroPruebas.Helpers;
@@ -11,7 +11,6 @@ public static partial class HardwareTests
 {
     private static IntPtr _crm = IntPtr.Zero;
     private static bool _reinicioMecanicoHecho;
-    private static bool _depositoPreparado;
     private static RecicladoraConfig Crm => HardwareConfig.Actual.Recicladora;
 
     /// <param name="reinicioMecanico">true = además ejecuta iPowerOnInitEx (la recicladora se mueve). Por defecto solo conecta y lee.</param>
@@ -43,34 +42,16 @@ public static partial class HardwareTests
     }
 
     /// <summary>
-    /// Paso 1 de 2 del depósito manual (sin asistente: el dev ve todo por videollamada). Deja la recicladora
-    /// en modo depósito y abre el shutter para que el dev coloque los billetes a mano. Paso 2 es
-    /// <see cref="Test_DepositarEnCasetes"/>; si esa falla, el dev vuelve a llamar este método para recuperarlos.
+    /// Depósito según el flujo recomendado por GRG (PDF §5.3), sin preguntas (el dev ve todo por videollamada):
+    /// iPrepareNextTransaction -> iPrepareDeposit -> iOpenShutter -> sondeo de iGetDevStatusEx hasta que coloquen
+    /// billetes (o "Cancel" por tiempo agotado) -> iCloseShutter -> iCashCount por lotes -> iStoreMoneyEx si se contó
+    /// algo ("Confirm deposit = Y"); si no, iCancelDepositEx + iOpenShutter para devolverlos.
+    /// "Continue count?" se decide solo: otro lote si el conteo se cortó por LimiteDeposito (25120) y quedan billetes
+    /// en la ranura; se termina si la ranura quedó vacía o solo quedaron rechazados.
     /// </summary>
-    public static void Test_AbrirShutterDeposito()
+    public static void Test_DepositarBilletes()
     {
-        var r = new Reporte("Recicladora GRG 9250N - Abrir shutter para depósito");
-        try
-        {
-            if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
-
-            using var s = new NativeScope();
-            var pStatus = s.Salida<tDevReturn>();
-            _depositoPreparado = CrmOk(r, "iPrepareDeposit", CRM9250N.iPrepareDeposit(_crm, pStatus), pStatus);
-            CrmOk(r, "iOpenShutter", CRM9250N.iOpenShutter(_crm, pStatus), pStatus);
-        }
-        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
-        r.Finalizar();
-    }
-
-    /// <summary>
-    /// Paso 2 de 2: con el shutter ya abierto y los billetes ya colocados a mano (Test_AbrirShutterDeposito),
-    /// cierra, cuenta y guarda en casetes. Si no se pudo depositar nada (0 contados), cancela la transacción
-    /// pero NO reabre el shutter: el dev lo hace manualmente con Test_AbrirShutterDeposito para recuperarlos.
-    /// </summary>
-    public static void Test_DepositarEnCasetes()
-    {
-        var r = new Reporte("Recicladora GRG 9250N - Depositar en casetes");
+        var r = new Reporte("Recicladora GRG 9250N - Depositar billetes (flujo GRG)");
         try
         {
             if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
@@ -78,63 +59,175 @@ public static partial class HardwareTests
             using var s = new NativeScope();
             var pStatus = s.Salida<tDevReturn>();
 
-            // Sin "Abrir shutter para depósito" en esta sesión (o tras un reinicio mecánico) la máquina no está en
-            // modo depósito. iPrepareDeposit no mueve nada, así que se manda aquí para no contar fuera de transacción.
-            if (!_depositoPreparado)
+            Paso("INICIO del flujo de depósito de GRG");
+            Paso($"Modo de validación de billetes: {Crm.ModoValidacionBilletes} ({NombreModoValidacion(Crm.ModoValidacionBilletes)}), " +
+                 $"límite por conteo: {Crm.LimiteDeposito} billete(s)");
+            Paso("iPrepareNextTransaction: preparar la transacción");
+            if (!CrmOk(r, "iPrepareNextTransaction", CRM9250N.iPrepareNextTransaction(_crm, pStatus), pStatus))
+            { Paso("FIN: no se pudo preparar la transacción"); r.Finalizar(); return; }
+
+            Paso("iPrepareDeposit: reservar el depósito");
+            if (!CrmOk(r, "iPrepareDeposit", CRM9250N.iPrepareDeposit(_crm, pStatus), pStatus))
             {
-                Consola.Aviso("        No se corrió \"Abrir shutter para depósito\" antes: se prepara el depósito ahora.");
-                if (!CrmOk(r, "iPrepareDeposit", CRM9250N.iPrepareDeposit(_crm, pStatus), pStatus))
-                {
-                    // 26301: billetes en la ranura (p. ej. rechazados de un intento anterior). El depósito solo se
-                    // puede preparar con la ranura vacía, por eso el orden es: opción 2 primero y luego colocar.
-                    if (Native.Leer<tDevReturn>(pStatus).iLogicCode == 26301)
-                        Consola.Aviso("        Hay billetes en la ranura de un intento anterior. Ábrala con \"Abrir shutter\", " +
-                                      "retírelos, y luego: \"Abrir shutter para depósito\" -> colocar billetes -> \"Depositar en casetes\".");
-                    r.Finalizar(); return;
-                }
+                // 26301: billetes en la ranura de un intento anterior; el depósito solo se prepara con la ranura vacía.
+                if (Native.Leer<tDevReturn>(pStatus).iLogicCode == 26301)
+                    Consola.Aviso("        Hay billetes en la ranura de un intento anterior: ábrala con \"Abrir shutter\", retírelos y repita.");
+                Paso("FIN: no se pudo preparar el depósito");
+                r.Finalizar(); return;
             }
-            _depositoPreparado = false;
 
-            if (!CrmOk(r, "iCloseShutter", CRM9250N.iCloseShutter(_crm, pStatus), pStatus)) { r.Finalizar(); return; }
+            Paso("iOpenShutter: abrir para colocar los billetes");
+            if (!CrmOk(r, "iOpenShutter", CRM9250N.iOpenShutter(_crm, pStatus), pStatus))
+            { Paso("FIN: el shutter no abrió"); r.Finalizar(); return; }
 
-            var conteo = Native.Cero<tCRM9250N_CashCount>();
-            conteo.iDepositLimit = Crm.LimiteDeposito;
-            var pConteo = s.Entrada(conteo);
-            if (!CrmOk(r, "iCashCount", CRM9250N.iCashCount(_crm, pConteo, pStatus), pStatus)) { r.Finalizar(); return; }
-
-            var res = Native.Leer<tCRM9250N_CashCount>(pConteo);
-            var detalle = $"total={res.iTotalCount} rechazados={res.iRejectCount} desconocidos={res.sDenomNumInfo.iUnknownCount}";
-            ImprimirDenominaciones(res.sDenomNumInfo);
-            if (res.iRejectCount > 0) ImprimirMotivosRechazo();
-
-            if (res.iTotalCount > 0)
+            if (!EsperarColocacionDeBilletes())
             {
+                // Rama "Cancel" del flujo: nadie colocó billetes. NE vacío y NF vacío -> cerrar y terminar.
+                Paso("¿Se colocaron billetes? NO, tiempo agotado -> Cancel");
+                Consola.Aviso($"        No se colocaron billetes en {Crm.SegundosColocarBilletes} s: no hay nada que depositar.");
+                CancelarDepositoSinConteo(r);
+                Paso("FIN del flujo de depósito");
+                r.Finalizar(); return;
+            }
+
+            Paso("iCloseShutter: cerrar para contar");
+            if (!CrmOk(r, "iCloseShutter", CRM9250N.iCloseShutter(_crm, pStatus), pStatus))
+            { Paso("FIN: el shutter no cerró"); r.Finalizar(); return; }
+
+            int totalContado = 0, totalRechazado = 0;
+            for (var lote = 1; lote <= Crm.MaxLotesDeposito; lote++)
+            {
+                var conteo = Native.Cero<tCRM9250N_CashCount>();
+                conteo.iDepositLimit = Crm.LimiteDeposito;
+                var pConteo = s.Entrada(conteo);
+                Paso($"iCashCount: contar lote {lote}");
+                var rc = CRM9250N.iCashCount(_crm, pConteo, pStatus);
+                var logica = Native.Leer<tDevReturn>(pStatus).iLogicCode;
+                if (!CrmOk(r, $"iCashCount lote {lote}", rc, pStatus)) break;
+
+                var res = Native.Leer<tCRM9250N_CashCount>(pConteo);
+                totalContado += res.iTotalCount;
+                totalRechazado += res.iRejectCount;
+                Evento($"Lote {lote}: contados={res.iTotalCount} rechazados={res.iRejectCount} " +
+                       $"desconocidos={res.sDenomNumInfo.iUnknownCount} (acumulado en NE: {totalContado})");
+                ImprimirDenominaciones(res.sDenomNumInfo);
+                if (res.iRejectCount > 0)
+                {
+                    Paso($"iGetNvNotesInfoEx (opcional): {res.iRejectCount} rechazo(s) en el lote {lote}");
+                    ImprimirMotivosRechazo();
+                }
+
+                // "Continue count?": solo si el conteo se cortó por el límite y aún hay billetes en la ranura.
+                var d = LeerEstadoDispositivo();
+                var quedanEnRanura = d is { byNfHasNotes: not 0 } || d is { byShutterAreaHasNotes: not 0 };
+                var cortePorLimite = logica == 25120 || res.iTotalCount >= Crm.LimiteDeposito;
+                if (cortePorLimite && quedanEnRanura && lote < Crm.MaxLotesDeposito)
+                {
+                    Paso($"¿Continuar contando? SÍ: el lote {lote} llegó al límite ({Crm.LimiteDeposito}) y quedan billetes en la ranura");
+                    continue;
+                }
+                Paso(quedanEnRanura
+                    ? "¿Continuar contando? NO: en la ranura solo quedan billetes rechazados"
+                    : "¿Continuar contando? NO: la ranura quedó vacía");
+                if (cortePorLimite && quedanEnRanura)
+                    Consola.Aviso($"        Se alcanzó el máximo de {Crm.MaxLotesDeposito} lote(s); lo que quede en la ranura se devuelve.");
+                break;
+            }
+
+            if (totalContado > 0)
+            {
+                Paso($"¿Confirmar depósito? SÍ ({totalContado} billete(s) en NE) -> iStoreMoneyEx");
                 var store = Native.Cero<tCRM9250N_StoreMoneyEx>();
                 store.byRejectPos = Crm.DestinoRechazoDeposito;
                 store.byNvMode = 0;
                 // Prioridad 1..4 para RC1..RC4 (0x01-0x0F, menor = más prioridad), como en la demo de GRG.
                 for (var i = 0; i < 4; i++) store.abyCassettePriority[i] = (byte)(i + 1);
                 var pStore = s.Entrada(store);
-                CrmOk(r, $"iStoreMoneyEx: depósito de {res.iTotalCount} billete(s)", CRM9250N.iStoreMoneyEx(_crm, pStore, pStatus), pStatus);
+                CrmOk(r, $"iStoreMoneyEx: depósito de {totalContado} billete(s)", CRM9250N.iStoreMoneyEx(_crm, pStore, pStatus), pStatus);
+                r.Criterio("Depósito realizado (se contó al menos 1 billete)", true,
+                    $"contados={totalContado} rechazados={totalRechazado}");
+
+                // Los rechazados regresan a la ranura: se abre el shutter para devolverlos y se recogen si nadie los toma.
+                if (LeerEstadoDispositivo() is { byNfHasNotes: not 0 } or { byShutterAreaHasNotes: not 0 })
+                {
+                    Paso("Quedaron billetes rechazados en la ranura -> iOpenShutter para devolverlos");
+                    if (CrmOk(r, "iOpenShutter (devolver rechazados)", CRM9250N.iOpenShutter(_crm, pStatus), pStatus))
+                        EsperarRetiroDeBilletes(r);
+                    CerrarYRecogerRemanentes(r);
+                }
             }
             else
             {
-                var cancel = Native.Cero<tCRM9250N_CancelDepositEx>();
-                var pCancel = s.Entrada(cancel);
+                Paso("¿Confirmar depósito? NO (0 billetes aceptados) -> iCancelDepositEx + iOpenShutter para devolverlos");
+                var pCancel = s.Entrada(Native.Cero<tCRM9250N_CancelDepositEx>());
                 CrmOk(r, "iCancelDepositEx", CRM9250N.iCancelDepositEx(_crm, pCancel, pStatus), pStatus);
-                if (res.iRejectCount == 0)
-                    // logic 25113 "No note is in input slot": no hubo nada que depositar, no es falla de la máquina.
-                    Consola.Aviso($"        No había billetes en la ranura ({detalle}). Corra primero \"Abrir shutter para depósito\" " +
-                                  "y coloque los billetes antes de \"Depositar en casetes\".");
-                else
-                    r.Criterio("Depósito realizado (se contó al menos 1 billete)", false,
-                        $"{detalle} — la máquina rechazó los billetes; abrir el shutter (Abrir shutter para depósito) para recuperarlos");
+                r.Criterio("Depósito realizado (se contó al menos 1 billete)", false,
+                    $"contados=0 rechazados={totalRechazado} — la máquina no aceptó ningún billete; se devuelven por el shutter");
+                if (CrmOk(r, "iOpenShutter (devolver billetes)", CRM9250N.iOpenShutter(_crm, pStatus), pStatus))
+                    EsperarRetiroDeBilletes(r);
+                CerrarYRecogerRemanentes(r);
             }
-
-            CrmOk(r, "iPrepareNextTransaction", CRM9250N.iPrepareNextTransaction(_crm, pStatus), pStatus);
+            Paso("FIN del flujo de depósito");
         }
         catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
         r.Finalizar();
+    }
+
+    // Sondeo de iGetDevStatusEx hasta detectar billetes en la ranura/shutter. Tras detectarlos espera unos segundos
+    // más para que terminen de acomodar el fajo antes de cerrar.
+    private static bool EsperarColocacionDeBilletes()
+    {
+        Paso($"iGetDevStatusEx (sondeo cada 500 ms): esperando que coloquen billetes, máx. {Crm.SegundosColocarBilletes} s");
+        Consola.Aviso("  >> Shutter abierto: coloque los billetes");
+        var inicio = DateTime.UtcNow;
+        var limite = inicio.AddSeconds(Crm.SegundosColocarBilletes);
+        var proximoReporte = inicio.AddSeconds(5);
+        while (DateTime.UtcNow < limite)
+        {
+            if (LeerEstadoDispositivo() is { byNfHasNotes: not 0 } or { byShutterAreaHasNotes: not 0 })
+            {
+                Paso($"¿Se colocaron billetes? SÍ (a los {(DateTime.UtcNow - inicio).TotalSeconds:0} s); " +
+                     $"se esperan {Crm.SegundosAcomodoBilletes} s para que terminen de acomodarlos");
+                Thread.Sleep(Crm.SegundosAcomodoBilletes * 1000);
+                return true;
+            }
+            if (DateTime.UtcNow >= proximoReporte)
+            {
+                Evento($"Esperando billetes... quedan {(limite - DateTime.UtcNow).TotalSeconds:0} s");
+                proximoReporte = proximoReporte.AddSeconds(5);
+            }
+            Thread.Sleep(500);
+        }
+        return false;
+    }
+
+    // Rama "Cancel" sin conteo: si hay billetes en NE se cancela el depósito y se devuelven; si solo hay en NF y
+    // nadie los toma, se cierran y se recogen; si no hay nada, solo se cierra el shutter.
+    private static void CancelarDepositoSinConteo(Reporte r)
+    {
+        using var s = new NativeScope();
+        var pStatus = s.Salida<tDevReturn>();
+        var d = LeerEstadoDispositivo();
+        if (d is { byNeHasNotes: not 0 })
+        {
+            Paso("¿Hay billetes en NE? SÍ -> iCloseShutter + iCancelDepositEx + iOpenShutter");
+            CrmOk(r, "iCloseShutter", CRM9250N.iCloseShutter(_crm, pStatus), pStatus);
+            CrmOk(r, "iCancelDepositEx", CRM9250N.iCancelDepositEx(_crm, s.Entrada(Native.Cero<tCRM9250N_CancelDepositEx>()), pStatus), pStatus);
+            if (CrmOk(r, "iOpenShutter (devolver billetes)", CRM9250N.iOpenShutter(_crm, pStatus), pStatus))
+                EsperarRetiroDeBilletes(r);
+            CerrarYRecogerRemanentes(r);
+        }
+        else if (d is { byNfHasNotes: not 0 })
+        {
+            Paso("¿Hay billetes en NF? SÍ -> esperar retiro; si no los toman, iCloseShutter + iRetractEx");
+            EsperarRetiroDeBilletes(r);
+            CerrarYRecogerRemanentes(r);
+        }
+        else
+        {
+            Paso("¿Hay billetes en NE/NF? NO -> cerrar el shutter");
+            CrmOk(r, "iCloseShutter", CRM9250N.iCloseShutter(_crm, pStatus), pStatus);
+        }
     }
 
     /// <param name="pedido">
@@ -481,7 +574,6 @@ public static partial class HardwareTests
         if (!CrmOk(r, "iPowerOnInitEx", CRM9250N.iPowerOnInitEx(_crm, pCfg, pCasetes, pEstado, pInit, pStatus), pStatus))
             return false;
         _reinicioMecanicoHecho = true;
-        _depositoPreparado = false;
         ListarCasetes(Native.Leer<tCRM9250N_CassetteStatusEx>(pEstado));
         return true;
     }

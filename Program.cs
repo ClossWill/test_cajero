@@ -22,8 +22,7 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
     {
         ("1", "Inicializar (conecta, sin movimiento)", () => HardwareTests.Test_InicializarRecicladora()),
         ("11", "Reinicio mecánico (iPowerOnInitEx, SE MUEVE)", () => HardwareTests.Test_InicializarRecicladora(reinicioMecanico: true)),
-        ("2", "Abrir shutter para depósito (paso 1: coloque los billetes después)", HardwareTests.Test_AbrirShutterDeposito),
-        ("23", "Depositar en casetes (paso 2: cierra, cuenta y guarda)", HardwareTests.Test_DepositarEnCasetes),
+        ("2", "Depositar billetes (flujo GRG: abre, espera billetes, cuenta por lotes y guarda)", HardwareTests.Test_DepositarBilletes),
         ("3", "Dispensar billetes",       () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa())),
         ("20", "Abrir shutter (control manual)",    HardwareTests.Test_AbrirShutter),
         ("21", "Cerrar shutter (control manual)",   HardwareTests.Test_CerrarShutter),

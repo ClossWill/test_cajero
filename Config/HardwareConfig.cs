@@ -47,6 +47,9 @@ public sealed class RecicladoraConfig
     public byte DestinoRechazoDeposito { get; set; } = 1;   // byRejectPos: 1 = AC1, 2 = AC2, 3 = LRB
     public int MaxBilletesPrueba { get; set; } = 5;
     public int SegundosRetiroBilletes { get; set; } = 60;   // espera a que retiren lo dispensado antes de cerrar el shutter
+    public int SegundosColocarBilletes { get; set; } = 60;  // depósito: espera a que coloquen billetes tras abrir el shutter
+    public int SegundosAcomodoBilletes { get; set; } = 3;   // depósito: margen tras detectar billetes para que terminen de acomodarlos
+    public int MaxLotesDeposito { get; set; } = 10;         // depósito: tope de conteos (iCashCount) por transacción
     public byte DestinoRetract { get; set; } = 2;           // byRetractPos: 1 = LRB, 2 = AC, 3 = NE (eCRM9250N_RetractPos)
     public int IntentosRecuperacion { get; set; } = 3;      // reinicios tras una dispensa fallida antes de pedir mantenimiento
     // NOTEVALIDMODE de CRM9250NDevCfg.ini (0 = billete real, 15 = billete simulado, como CRM9250NTest.exe de GRG).
