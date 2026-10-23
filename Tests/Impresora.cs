@@ -361,7 +361,7 @@ public static partial class HardwareTests
 
             // Un trabajo a medias de una falla anterior saldría pegado a este ticket.
             AutoReplyPrintSdk.LimpiarBuffer(h);
-            AutoReplyPrintSdk.ConsultarContadores(h, out _, out var paginaAntes);
+            AutoReplyPrintSdk.ConsultarContadores(h, out var bytesAntes, out var paginaAntes);
             AutoReplyPrintSdk.Reset(h);
 
             // Datos de muestra: una operación de compra de dólares consistente con los casetes reales
@@ -432,11 +432,15 @@ public static partial class HardwareTests
             var salioImpreso = AutoReplyPrintSdk.ConsultarResultadoImpresion(h, 3000);
             r.Criterio("El SDK confirma que el ticket se imprimió (QueryPrintResult)", salioImpreso);
 
-            // Segunda confirmación independiente: el id de la última página impresa que reporta la impresora avanzó.
+            // Segunda confirmación independiente: la impresora recibió bytes nuevos (contador propio de la impresora).
+            // El id de página impresa NO es criterio: visto el 2026-10-23 en la KP-80A (fw mh1.12.03) que se queda en 0
+            // aunque el ticket sale y QueryPrintResult confirma; ese id parece contar solo páginas de etiqueta, no tickets.
             if (AutoReplyPrintSdk.ConsultarContadores(h, out var bytes, out var paginaDespues))
             {
-                Consola.Info($"        Bytes recibidos por la impresora: {bytes} | página impresa: {paginaAntes} -> {paginaDespues}");
-                r.Criterio("La impresora reporta una página nueva impresa", paginaDespues != paginaAntes);
+                Consola.Info($"        Bytes recibidos por la impresora: {bytesAntes} -> {bytes} | id de página impresa: {paginaAntes} -> {paginaDespues}");
+                r.Criterio("La impresora reporta haber recibido el trabajo (contador de bytes)", bytes != bytesAntes);
+                if (paginaDespues == paginaAntes)
+                    Consola.Info("        El id de página no avanzó: informativo, esta impresora no lo incrementa con tickets.");
             }
 
             if (AutoReplyPrintSdk.ConsultarEstadoAutonomo(h, out var erroresFinal, out _))
