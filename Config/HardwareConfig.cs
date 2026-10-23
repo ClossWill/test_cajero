@@ -142,6 +142,8 @@ public sealed class LedsConfig
     // Cuántos de los 18 canales están conectados a un ícono identificable del gabinete (recibo, moneda,
     // pasaporte, QR, efectivo). La prueba prueba canales uno por uno y se detiene en cuanto los identifica.
     public int PerifericosEsperados { get; set; } = 5;
+    // Segundos que cada canal permanece encendido durante el barrido, para dar tiempo a identificar su ícono y anotarlo.
+    public int SegundosPausaBarrido { get; set; } = 60;
 }
 
 // Item 12 del BEEX (GDZS-DC004-MG3021): cámara USB estándar, detectada por Windows sin driver propio.

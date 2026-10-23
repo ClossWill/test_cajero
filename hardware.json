@@ -76,7 +76,8 @@
     "Puerto": "COM2", // confirmado en la máquina real (2026-10-16): firmware "ADK LEDBOX V2.0-20240613"
     "BaudRate": 19200,
     "Canales": 18,
-    "PerifericosEsperados": 5 // recibo, moneda, pasaporte, QR, efectivo; la prueba se detiene al identificarlos
+    "PerifericosEsperados": 5, // recibo, moneda, pasaporte, QR, efectivo; la prueba se detiene al identificarlos
+    "SegundosPausaBarrido": 60 // cada canal queda encendido este tiempo en el barrido (18 canales x 60 s = 18 min)
   },
   "Camara": {
     // Item 12 del BEEX (GDZS-DC004-MG3021): webcam USB estándar, sin SDK propio.
