@@ -50,6 +50,9 @@ public sealed class RecicladoraConfig
     public int SegundosColocarBilletes { get; set; } = 60;  // depósito: espera a que coloquen billetes tras abrir el shutter
     public int SegundosAcomodoBilletes { get; set; } = 3;   // depósito: margen tras detectar billetes para que terminen de acomodarlos
     public int MaxLotesDeposito { get; set; } = 10;         // depósito: tope de conteos (iCashCount) por transacción
+    // Byte alto del código de denominación del NV por moneda (0x03xx = USD, 0x08xx = MXN). Deducido de la tabla del lector
+    // (medidas y los códigos grabados en los casetes, 2026-10-21); POR CONFIRMAR con el primer depósito de cada moneda.
+    public Dictionary<string, int> FamiliaDenominacionPorMoneda { get; set; } = new() { ["MXN"] = 8, ["USD"] = 3 };
     public byte DestinoRetract { get; set; } = 2;           // byRetractPos: 1 = LRB, 2 = AC, 3 = NE (eCRM9250N_RetractPos)
     public int IntentosRecuperacion { get; set; } = 3;      // reinicios tras una dispensa fallida antes de pedir mantenimiento
     // NOTEVALIDMODE de CRM9250NDevCfg.ini (0 = billete real, 15 = billete simulado, como CRM9250NTest.exe de GRG).

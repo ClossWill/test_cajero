@@ -17,6 +17,7 @@
     "SegundosColocarBilletes": 60,            // depósito: espera a que coloquen billetes tras abrir el shutter
     "SegundosAcomodoBilletes": 3,             // depósito: margen tras detectar billetes antes de cerrar
     "MaxLotesDeposito": 10,                   // depósito: tope de conteos por transacción (LimiteDeposito = billetes por conteo)
+    "FamiliaDenominacionPorMoneda": { "MXN": 8, "USD": 3 },  // byte alto del código del NV: 0x08xx = MXN, 0x03xx = USD (por confirmar)
     "DestinoRetract": 2,                      // byRetractPos de iRetractEx: 1 = LRB, 2 = AC, 3 = NE
     "IntentosRecuperacion": 3,                // reinicios tras dispensa fallida antes de pedir mantenimiento
     "ModoValidacionBilletes": 0,              // NOTEVALIDMODE del SDK: 0 = billete real (PRODUCCIÓN), 15 = billete simulado (pruebas)
@@ -34,7 +35,8 @@
       { "Indice": 4, "Nombre": "Cassette 4", "Moneda": "MXN", "Denominacion": 500 }
     ],
     // Se llena con lo observado en Test_AceptarBilletes: código del SDK -> etiqueta. Ej. "12": "USD 20"
-    "EtiquetaDenominacion": {}
+    // Códigos grabados en cada casete (opción 22, 2026-10-21); la moneda sale del orden RC1..RC4 de arriba, por confirmar con el primer depósito.
+    "EtiquetaDenominacion": { "821": "USD 20", "2135": "MXN 100", "2120": "MXN 200", "2121": "MXN 500" }
   },
   "Monederos": {
     "BaudRate": 9600,

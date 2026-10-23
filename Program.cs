@@ -22,8 +22,11 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
     {
         ("1", "Inicializar (conecta, sin movimiento)", () => HardwareTests.Test_InicializarRecicladora()),
         ("11", "Reinicio mecánico (iPowerOnInitEx, SE MUEVE)", () => HardwareTests.Test_InicializarRecicladora(reinicioMecanico: true)),
-        ("2", "Depositar billetes (flujo GRG: abre, espera billetes, cuenta por lotes y guarda)", HardwareTests.Test_DepositarBilletes),
-        ("3", "Dispensar billetes",       () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa())),
+        ("25", "Configurar (iInitSettingEx, sin movimiento)", HardwareTests.Test_ConfigurarRecicladora),
+        ("2", "Depositar pesos MXN (flujo GRG: abre, espera billetes, cuenta por lotes y guarda)", () => HardwareTests.Test_DepositarBilletes("MXN")),
+        ("23", "Depositar dólares USD (mismo flujo, solo acepta USD)", () => HardwareTests.Test_DepositarBilletes("USD")),
+        ("3", "Dispensar pesos MXN",      () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa("MXN"))),
+        ("24", "Dispensar dólares USD",   () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa("USD"))),
         ("20", "Abrir shutter (control manual)",    HardwareTests.Test_AbrirShutter),
         ("21", "Cerrar shutter (control manual)",   HardwareTests.Test_CerrarShutter),
         ("22", "Consultar inventario (solo lectura)", HardwareTests.Test_ConsultarInventario),
@@ -119,13 +122,14 @@ static string PedirTexto(string pregunta, string porDefecto)
 
 // Arma una orden de dispensa de uno o varios casetes (ej. 500+200+100 MXN juntos) antes de mandarla como una
 // sola llamada atómica a iDispenseEx.
-static (string Moneda, int Denominacion, int Cantidad)[] PedirPedidoDispensa()
+static (string Moneda, int Denominacion, int Cantidad)[] PedirPedidoDispensa(string moneda)
 {
     var pedido = new List<(string Moneda, int Denominacion, int Cantidad)>();
     do
     {
-        var moneda = PedirTexto("Moneda (MXN/USD)", "MXN");
-        var denominacion = PedirEntero("Denominación (500/200/100 MXN, 20 USD)", 100);
+        var denominacion = moneda == "USD"
+            ? PedirEntero("Denominación en USD (20)", 20)
+            : PedirEntero("Denominación en MXN (500/200/100)", 100);
         var cantidad = PedirEntero("Cantidad de billetes de esa denominación", 1);
         pedido.Add((moneda, denominacion, cantidad));
     } while (Consola.Confirmar("¿Agregar otra denominación a la misma orden?"));

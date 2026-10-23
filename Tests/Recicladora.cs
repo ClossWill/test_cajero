@@ -21,7 +21,8 @@ public static partial class HardwareTests
             : "Recicladora GRG 9250N - Inicialización (conexión, sin movimiento)");
         try
         {
-            if (InicializarRecicladora(r) && reinicioMecanico) ReiniciarMecanicamenteRecicladora(r);
+            if (!reinicioMecanico) InicializarRecicladora(r);
+            else EncenderRecicladora(r);
         }
         catch (Exception ex) when (ex is DllNotFoundException or BadImageFormatException)
         {
@@ -49,9 +50,10 @@ public static partial class HardwareTests
     /// "Continue count?" se decide solo: otro lote si el conteo se cortó por LimiteDeposito (25120) y quedan billetes
     /// en la ranura; se termina si la ranura quedó vacía o solo quedaron rechazados.
     /// </summary>
-    public static void Test_DepositarBilletes()
+    /// <param name="moneda">"MXN" o "USD": solo se aceptan billetes de esa moneda (los demás se rechazan y se devuelven). null = cualquiera.</param>
+    public static void Test_DepositarBilletes(string? moneda = null)
     {
-        var r = new Reporte("Recicladora GRG 9250N - Depositar billetes (flujo GRG)");
+        var r = new Reporte($"Recicladora GRG 9250N - Depositar {(moneda is null ? "billetes" : moneda == "MXN" ? "pesos (MXN)" : "dólares (USD)")} (flujo GRG)");
         try
         {
             if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
@@ -62,6 +64,13 @@ public static partial class HardwareTests
             Paso("INICIO del flujo de depósito de GRG");
             Paso($"Modo de validación de billetes: {Crm.ModoValidacionBilletes} ({NombreModoValidacion(Crm.ModoValidacionBilletes)}), " +
                  $"límite por conteo: {Crm.LimiteDeposito} billete(s)");
+            var noAceptadas = DenominacionesDeOtrasMonedas(moneda);
+            if (moneda is not null)
+                Paso($"Depósito solo de {moneda}: awUnacceptableDenom excluye {noAceptadas.Count} código(s) de otras monedas");
+
+            if (moneda is not null && !ConfigurarMonedaDeposito(r, moneda))
+            { Paso("FIN: no se pudo configurar la moneda del depósito"); r.Finalizar(); return; }
+
             Paso("iPrepareNextTransaction: preparar la transacción");
             if (!CrmOk(r, "iPrepareNextTransaction", CRM9250N.iPrepareNextTransaction(_crm, pStatus), pStatus))
             { Paso("FIN: no se pudo preparar la transacción"); r.Finalizar(); return; }
@@ -99,6 +108,8 @@ public static partial class HardwareTests
             {
                 var conteo = Native.Cero<tCRM9250N_CashCount>();
                 conteo.iDepositLimit = Crm.LimiteDeposito;
+                for (var i = 0; i < Math.Min(noAceptadas.Count, conteo.awUnacceptableDenom.Length); i++)
+                    conteo.awUnacceptableDenom[i] = noAceptadas[i];
                 var pConteo = s.Entrada(conteo);
                 Paso($"iCashCount: contar lote {lote}");
                 var rc = CRM9250N.iCashCount(_crm, pConteo, pStatus);
@@ -143,7 +154,8 @@ public static partial class HardwareTests
                 // Prioridad 1..4 para RC1..RC4 (0x01-0x0F, menor = más prioridad), como en la demo de GRG.
                 for (var i = 0; i < 4; i++) store.abyCassettePriority[i] = (byte)(i + 1);
                 var pStore = s.Entrada(store);
-                CrmOk(r, $"iStoreMoneyEx: depósito de {totalContado} billete(s)", CRM9250N.iStoreMoneyEx(_crm, pStore, pStatus), pStatus);
+                var storeOk = CrmOk(r, $"iStoreMoneyEx: depósito de {totalContado} billete(s)", CRM9250N.iStoreMoneyEx(_crm, pStore, pStatus), pStatus);
+                if (storeOk) ImprimirDestinoDeposito(Native.Leer<tCRM9250N_StoreMoneyEx>(pStore));
                 r.Criterio("Depósito realizado (se contó al menos 1 billete)", true,
                     $"contados={totalContado} rechazados={totalRechazado}");
 
@@ -171,6 +183,31 @@ public static partial class HardwareTests
         }
         catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
         r.Finalizar();
+    }
+
+    // Códigos del NV que NO son de la moneda pedida, para iCashCount.awUnacceptableDenom (vale solo para ese conteo,
+    // no requiere reiniciar la máquina). La moneda de cada código se deduce de su byte alto (FamiliaDenominacionPorMoneda).
+    private static List<ushort> DenominacionesDeOtrasMonedas(string? moneda)
+    {
+        var excluidas = new List<ushort>();
+        if (moneda is null) return excluidas;
+        if (!Crm.FamiliaDenominacionPorMoneda.TryGetValue(moneda, out var familia))
+        {
+            Consola.Aviso($"        Moneda '{moneda}' sin familia de denominación en hardware.json: se aceptan todas.");
+            return excluidas;
+        }
+
+        using var s = new NativeScope();
+        var pStatus = s.Salida<tDevReturn>();
+        var pTabla = s.Salida<tCRM9250N_DenominationTable>();
+        if (Crm9250NExtra.iGetDenominationTable(_crm, pTabla, pStatus) != Crm.CodigoExito)
+        {
+            Consola.Aviso("        No se pudo leer la tabla de denominaciones: no se filtra por moneda (se aceptan todas).");
+            return excluidas;
+        }
+        foreach (var d in Native.Leer<tCRM9250N_DenominationTable>(pTabla).asDenominationInfo)
+            if (d.wDenomCode != 0 && (d.wDenomCode >> 8) != familia) excluidas.Add(d.wDenomCode);
+        return excluidas;
     }
 
     // Sondeo de iGetDevStatusEx hasta detectar billetes en la ranura/shutter. Tras detectarlos espera unos segundos
@@ -248,6 +285,13 @@ public static partial class HardwareTests
             {
                 r.Criterio($"Entre 1 y {Crm.Casetes.Count} renglón(es) (un casete dispensable distinto por renglón)",
                     false, $"renglones={pedido.Length}");
+                r.Finalizar(); return;
+            }
+
+            if (pedido.Select(p => p.Moneda.ToUpperInvariant()).Distinct().Count() > 1)
+            {
+                r.Criterio("Todo el pedido es de una sola moneda (no se mezclan MXN y USD en una orden)", false,
+                    string.Join(", ", pedido.Select(p => $"{p.Moneda} {p.Denominacion}")));
                 r.Finalizar(); return;
             }
 
@@ -418,6 +462,7 @@ public static partial class HardwareTests
             { r.Finalizar(); return; }
 
             var estado = Native.Leer<tCRM9250N_CassetteStatusEx>(pEstado);
+            var info = Native.Leer<tCRM9250N_CassetteInfoEx>(pCasetes);
             foreach (var cassette in Crm.Casetes.OrderBy(c => c.Indice))
             {
                 var idx = cassette.Indice - 1;
@@ -427,9 +472,19 @@ public static partial class HardwareTests
                     continue;
                 }
                 var bin = estado.asRcStatus[idx];
-                Consola.Info($"        RC{cassette.Indice} {cassette.Nombre} ({cassette.Moneda} {cassette.Denominacion}): " +
-                             $"presente={bin.byExist} status={bin.byStatus}");
+                // wNoteType = denominación grabada en el propio casete (PDF §3.6). Sirve para verificar el mapa de hardware.json.
+                var grabado = info.asRcCassette[idx];
+                Consola.Info($"        RC{cassette.Indice} {cassette.Nombre} (hardware.json: {cassette.Moneda} {cassette.Denominacion}): " +
+                             $"presente={bin.byExist} status={bin.byStatus} | grabado en el casete: denominación={grabado.wNoteType} " +
+                             $"(0x{grabado.wNoteType:X4}) tipo={grabado.byCassetteType} función=0x{grabado.byFunction:X2}");
             }
+            for (var i = 0; i < info.sAcCassette.Length; i++)
+                if (estado.sAcStatus[i].byExist != 0)
+                    Consola.Info($"        AC{i + 1} (caja de rechazos): presente=1 status={estado.sAcStatus[i].byStatus} " +
+                                 $"tipo={info.sAcCassette[i].byCassetteType} función=0x{info.sAcCassette[i].byFunction:X2}");
+            if (estado.sAtcStatus.byExist != 0)
+                Consola.Info($"        ATC: presente=1 status={estado.sAtcStatus.byStatus}");
+            Consola.Info($"        LRB: presente={estado.sLrbStatus.byExist}");
             Consola.Aviso("        El SDK no reporta cantidad de billetes por casete en esta llamada; " +
                           "confirmar conteo físico visualmente si se requiere inventario exacto.");
         }
@@ -548,6 +603,61 @@ public static partial class HardwareTests
         return true;
     }
 
+    private static tCRM9250N_InitSettingEx ConfiguracionInicial(string? moneda = null)
+    {
+        var cfg = Native.Cero<tCRM9250N_InitSettingEx>();
+        cfg.byAtcMode = Crm.ModoAtc;
+        cfg.byWorkingMode = Crm.ModoTrabajo;
+        cfg.byDcAccepetAllDenom = Crm.AceptarTodasDenominaciones;
+        cfg.byInitCfg = Crm.ConfigInicio;
+        // PDF §3.2: awAcceptableDenom "empty: all not accepted". Con la lista en ceros el NV rechaza todo
+        // (visto el 2026-10-21: 18 rechazados, logic 25119). Se llena con lo que el propio NV dice soportar.
+        LlenarDenominacionesAceptadas(cfg.awAcceptableDenom, moneda);
+        return cfg;
+    }
+
+    /// <summary>
+    /// Equivale al "Support Notes" de la herramienta de GRG: el NV valida solo las denominaciones de la última
+    /// iInitSettingEx/iPowerOnInitEx y esa lista persiste en la máquina (visto el 2026-10-22: tras configurar USD en la
+    /// herramienta los pesos se rechazaban, y viceversa). Se carga la de la moneda del depósito antes de abrir el shutter.
+    /// No mueve nada.
+    /// </summary>
+    private static bool ConfigurarMonedaDeposito(Reporte r, string moneda)
+    {
+        Paso($"iInitSettingEx: cargar las denominaciones de {moneda} como las únicas aceptadas (Support Notes)");
+        using var s = new NativeScope();
+        var pStatus = s.Salida<tDevReturn>();
+        var cfg = ConfiguracionInicial(moneda);
+        if (cfg.awAcceptableDenom.All(d => d == 0))
+        {
+            r.Criterio($"Denominaciones de {moneda} cargadas", false, "El NV no reporta ninguna denominación de esa moneda (revisar FamiliaDenominacionPorMoneda).");
+            return false;
+        }
+        return CrmOk(r, $"iInitSettingEx ({moneda})", Crm9250NExtra.iInitSettingEx(_crm, s.Entrada(cfg), pStatus), pStatus);
+    }
+
+    /// <summary>
+    /// iInitSettingEx suelto (PDF §4.5): solo carga la configuración de trabajo (modo, denominaciones aceptadas) en
+    /// la recicladora. NO mueve nada: el reinicio mecánico es iInitEx / iPowerOnInitEx. Conecta si no hay handle.
+    /// </summary>
+    public static void Test_ConfigurarRecicladora()
+    {
+        var r = new Reporte("Recicladora GRG 9250N - Configurar (iInitSettingEx, sin movimiento)");
+        try
+        {
+            if (_crm == IntPtr.Zero && !InicializarRecicladora(r)) { r.Finalizar(); return; }
+
+            using var s = new NativeScope();
+            var pStatus = s.Salida<tDevReturn>();
+            var cfg = ConfiguracionInicial();
+            Consola.Info($"        Modo ATC={cfg.byAtcMode} trabajo={cfg.byWorkingMode} aceptar todas={cfg.byDcAccepetAllDenom} " +
+                         $"init cfg={cfg.byInitCfg} | denominaciones aceptadas: {cfg.awAcceptableDenom.Count(d => d != 0)}");
+            CrmOk(r, "iInitSettingEx", Crm9250NExtra.iInitSettingEx(_crm, s.Entrada(cfg), pStatus), pStatus);
+        }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
     /// <summary>
     /// iPowerOnInitEx: reinicio mecánico. Pasa el transporte a su posición inicial y manda al NF los billetes que haya en el canal
     /// (PDF §4.6). El dev ve el movimiento directo por videollamada: no se pide confirmación, solo se avisa.
@@ -558,15 +668,7 @@ public static partial class HardwareTests
 
         using var s = new NativeScope();
         var pStatus = s.Salida<tDevReturn>();
-        var cfg = Native.Cero<tCRM9250N_InitSettingEx>();
-        cfg.byAtcMode = Crm.ModoAtc;
-        cfg.byWorkingMode = Crm.ModoTrabajo;
-        cfg.byDcAccepetAllDenom = Crm.AceptarTodasDenominaciones;
-        cfg.byInitCfg = Crm.ConfigInicio;
-        // PDF §3.2: awAcceptableDenom "empty: all not accepted". Con la lista en ceros el NV rechaza todo
-        // (visto el 2026-10-21: 18 rechazados, logic 25119). Se llena con lo que el propio NV dice soportar.
-        LlenarDenominacionesAceptadas(cfg.awAcceptableDenom);
-        var pCfg = s.Entrada(cfg);
+        var pCfg = s.Entrada(ConfiguracionInicial());
         var pCasetes = s.Salida<tCRM9250N_CassetteInfoEx>();
         var pEstado = s.Salida<tCRM9250N_CassetteStatusEx>();
         var pInit = s.Salida<tCRM9250N_InitInfoEx>();
@@ -576,6 +678,44 @@ public static partial class HardwareTests
         _reinicioMecanicoHecho = true;
         ListarCasetes(Native.Leer<tCRM9250N_CassetteStatusEx>(pEstado));
         return true;
+    }
+
+    /// <summary>
+    /// Flujo "Power on" de GRG (PDF §5.1): hOpenLogicDevice -> iSetCommPara -> iPowerOnInitEx (rama A; equivale a la
+    /// rama B iInitSettingEx + iGetCassetteInfoEx + iInitEx, son alternativas y no se corren las dos) -> si la
+    /// recicladora está offline, iCloseComm + vCloseLogicDevice.
+    /// "Offline" = ya no responde iGetDevStatusEx tras inicializar. Si responde pero la inicialización falló, no está
+    /// offline: queda conectada para poder reintentar o diagnosticar.
+    /// </summary>
+    private static void EncenderRecicladora(Reporte r)
+    {
+        Paso("INICIO del flujo de encendido de GRG (5.1 Power on)");
+        Paso("hOpenLogicDevice + iSetCommPara: abrir el dispositivo y configurar la comunicación");
+        if (!InicializarRecicladora(r))
+        {
+            Paso("FIN: no se pudo abrir/configurar la comunicación");
+            return;
+        }
+
+        Paso("iPowerOnInitEx (rama A = iInitSettingEx + iGetCassetteInfoEx + iInitEx)");
+        var inicializada = ReiniciarMecanicamenteRecicladora(r);
+
+        Paso("¿Offline? iGetDevStatusEx para comprobar que la recicladora responde");
+        var offline = LeerEstadoDispositivo() is null;
+        if (!offline)
+        {
+            Paso(inicializada
+                ? "¿Offline? NO -> la recicladora queda conectada"
+                : "¿Offline? NO, pero la inicialización falló -> queda conectada para reintentar o diagnosticar");
+        }
+        else
+        {
+            Paso("¿Offline? SÍ -> iCloseComm + vCloseLogicDevice");
+            CerrarRecicladora();
+            r.Criterio("La recicladora responde tras la inicialización", false,
+                "No responde iGetDevStatusEx: se cerró la comunicación. Revisar cable USB y alimentación.");
+        }
+        Paso("FIN del flujo de encendido");
     }
 
     private static string NombreModoValidacion(int modo) =>
@@ -654,20 +794,26 @@ public static partial class HardwareTests
             "Se cierra el shutter y se recoge lo que quede.");
     }
 
-    // "iInitEx hasta N veces": iPowerOnInitEx ya incluye iInitEx (PDF §4.6) y además rearma la lista de denominaciones.
+    // Recuperación del flujo de dispensa de GRG: hasta N veces { iInitEx; ¿volvió a la normalidad? sí -> salir;
+    // no -> "Offline maintenance" y contar el intento }. Solo iInitEx: la configuración y los casetes ya se cargaron
+    // en el encendido (iPowerOnInitEx) de esta sesión. "Volvió a la normalidad" = iInitEx rc=0 y la máquina responde.
     private static bool RecuperarTrasFalla(Reporte r)
     {
         for (var intento = 1; intento <= Crm.IntentosRecuperacion; intento++)
         {
-            Paso($"iInitEx (vía iPowerOnInitEx): reinicio de recuperación {intento} de {Crm.IntentosRecuperacion}");
-            if (ReiniciarMecanicamenteRecicladora(r))
+            Paso($"iInitEx: reinicio de recuperación {intento} de {Crm.IntentosRecuperacion}");
+            using var s = new NativeScope();
+            var pStatus = s.Salida<tDevReturn>();
+            var pInit = s.Salida<tCRM9250N_InitInfoEx>();
+            var rcOk = CrmOk(r, "iInitEx", Crm9250NExtra.iInitEx(_crm, pInit, pStatus), pStatus);
+            if (rcOk && LeerEstadoDispositivo() is not null)
             {
-                Paso("¿Volvió a la normalidad? SÍ -> cerrar shutter");
+                Paso("¿Volvió a la normalidad? SÍ -> salir del bucle y cerrar el shutter");
                 return true;
             }
-            Paso(intento < Crm.IntentosRecuperacion
-                ? "¿Volvió a la normalidad? NO -> se reintenta"
-                : "¿Volvió a la normalidad? NO -> sin más reintentos");
+            Paso($"¿Volvió a la normalidad? NO -> Offline maintenance (intento {intento} de {Crm.IntentosRecuperacion})");
+            Consola.Aviso("        Offline maintenance: la recicladora no se recuperó con iInitEx; " +
+                          "puede requerir intervención de un técnico (atasco, casete o sensor).");
         }
         return false;
     }
@@ -706,7 +852,7 @@ public static partial class HardwareTests
         }
     }
 
-    private static void LlenarDenominacionesAceptadas(ushort[] destino)
+    private static void LlenarDenominacionesAceptadas(ushort[] destino, string? moneda = null)
     {
         using var s = new NativeScope();
         var pStatus = s.Salida<tDevReturn>();
@@ -721,7 +867,9 @@ public static partial class HardwareTests
         }
 
         var soportadas = Native.Leer<tCRM9250N_DenominationTable>(pTabla).asDenominationInfo
-            .Where(d => d.wDenomCode != 0).Take(destino.Length).ToList();
+            .Where(d => d.wDenomCode != 0)
+            .Where(d => moneda is null || !Crm.FamiliaDenominacionPorMoneda.TryGetValue(moneda, out var familia) || (d.wDenomCode >> 8) == familia)
+            .Take(destino.Length).ToList();
         for (var i = 0; i < soportadas.Count; i++) destino[i] = soportadas[i].wDenomCode;
 
         Consola.Info($"        Denominaciones que soporta el NV: {soportadas.Count}");
@@ -784,6 +932,31 @@ public static partial class HardwareTests
                          $"validación={d.byValidation} (0=real) cara={d.byFaceWay} destino={d.sNoteGoDest.iType} " +
                          $"errInfo={Consola.Hex(o.abyInfoErrCode)} errRechazo={Consola.Hex(o.abyRejectErrCode)}");
         }
+    }
+
+    // Destino real del depósito: iStoreMoneyEx devuelve en sInOutUnitsInfo cuántos billetes entraron a cada casete
+    // (aiRcInOutNum, 0-based, RC1..RC16) y a otras unidades (NE/NF, reciclador de banda, etc.).
+    private static void ImprimirDestinoDeposito(tCRM9250N_StoreMoneyEx res)
+    {
+        var u = res.sInOutUnitsInfo;
+        Consola.Info("        Destino del depósito (billetes por casete):");
+        var total = 0;
+        for (var i = 0; i < u.aiRcInOutNum.Length; i++)
+        {
+            if (u.aiRcInOutNum[i] == 0) continue;
+            total += u.aiRcInOutNum[i];
+            var cfg = Crm.Casetes.FirstOrDefault(c => c.Indice == i + 1);
+            var detalle = cfg is null ? "sin entrada en hardware.json" : $"{cfg.Nombre} ({cfg.Moneda} {cfg.Denominacion})";
+            Consola.Info($"        -> RC{i + 1} {detalle}: {u.aiRcInOutNum[i]} billete(s)");
+        }
+        for (var i = 0; i < u.iAcInOutNum.Length; i++)
+            if (u.iAcInOutNum[i] != 0) Consola.Info($"        -> AC{i + 1}: {u.iAcInOutNum[i]} billete(s)");
+        if (u.iLrbInOutNum != 0) Consola.Info($"        -> LRB: {u.iLrbInOutNum} billete(s)");
+        if (u.iAtcInOutNum != 0) Consola.Info($"        -> ATC: {u.iAtcInOutNum} billete(s)");
+        if (u.iNfInOutNum != 0) Consola.Info($"        -> NF (ranura): {u.iNfInOutNum} billete(s)");
+        if (u.iNeInOutNum != 0) Consola.Info($"        -> NE (escrow): {u.iNeInOutNum} billete(s)");
+        if (total == 0) Consola.Aviso("        iStoreMoneyEx no reportó billetes en ningún casete RC.");
+        ImprimirDenominaciones(res.sDenomNumInfo);
     }
 
     private static void ImprimirDenominaciones(tCRM9250N_DenomNumInfo info)

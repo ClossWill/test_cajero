@@ -19,6 +19,14 @@ internal static class Crm9250NExtra
     [DllImport("CRM9250NDev.dll", EntryPoint = "iGetDenominationTable")]
     public static extern int iGetDenominationTable(IntPtr p_hDevHandle, IntPtr p_psDenominationTable, IntPtr p_psStatus);
 
+    /// <summary>Carga la configuración de trabajo (modo, denominaciones aceptadas, casetes deshabilitados) sin mover nada. Es el primer paso de iPowerOnInitEx.</summary>
+    [DllImport("CRM9250NDev.dll", EntryPoint = "iInitSettingEx")]
+    public static extern int iInitSettingEx(IntPtr p_hDevHandle, IntPtr p_psInitSetting, IntPtr p_psStatus);
+
+    /// <summary>Reinicio mecánico solo (PDF §4.6): sin reconfigurar ni releer casetes. Es el paso de recuperación del flujo de dispensa.</summary>
+    [DllImport("CRM9250NDev.dll", EntryPoint = "iInitEx")]
+    public static extern int iInitEx(IntPtr p_hDevHandle, IntPtr p_psInitInfo, IntPtr p_psStatus);
+
     /// <summary>Cierra la comunicación (PDF §4.4).</summary>
     [DllImport("CRM9250NDev.dll", EntryPoint = "iCloseComm")]
     public static extern int iCloseComm(IntPtr p_hDevHandle, IntPtr p_psStatus);
