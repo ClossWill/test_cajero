@@ -78,6 +78,26 @@ public static class AutoReplyPrintSdk
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern int CP_Port_IsOpened(IntPtr handle);
 
+    // Estado que la impresora reporta sola en modo autoreply (no hace falta consultarlo con QueryRTStatus).
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Printer_GetPrinterStatusInfo(IntPtr handle, out long errorStatus, out long infoStatus,
+        out long timestampMs);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Printer_GetPrinterReceivedInfo(IntPtr handle, out uint bytesRecibidos, out long timestampMs);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Printer_GetPrinterPrintedInfo(IntPtr handle, out uint paginaImpresa, out long timestampMs);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Printer_GetPrinterFirmwareVersion(IntPtr handle, byte[] pBuf, uint cbBuf, out uint pcbNeeded);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Printer_ClearPrinterError(IntPtr handle);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Printer_ClearPrinterBuffer(IntPtr handle);
+
     public const int AlineacionIzquierda = 0;
     public const int AlineacionCentro = 1;
     public const int AlineacionDerecha = 2;
@@ -186,6 +206,54 @@ public static class AutoReplyPrintSdk
     public static bool ErrorCortador(int rtstatus) => ((rtstatus >> 16) & 0x08) == 0x08;
     public static bool ErrorIrrecuperable(int rtstatus) => ((rtstatus >> 16) & 0x20) == 0x20;
     public static bool PapelPorAgotarse(int rtstatus) => ((rtstatus >> 24) & 0x0C) == 0x0C;
+
+    /// <summary>Firmware de la impresora; null si no responde (mismo "sin verificación garantizada" que QueryRTStatus).</summary>
+    public static string? VersionFirmware(IntPtr handle)
+    {
+        var buf = new byte[256];
+        if (CP_Printer_GetPrinterFirmwareVersion(handle, buf, (uint)buf.Length, out _) == 0) return null;
+        var texto = System.Text.Encoding.Default.GetString(buf).TrimEnd('\0').Trim();
+        return texto.Length == 0 ? null : texto;
+    }
+
+    /// <summary>Estado autónomo de la impresora (modo autoreply). <paramref name="errores"/> y <paramref name="info"/> son las
+    /// máscaras CP_PRINTERSTATUS_ERROR_XXX / CP_PRINTERSTATUS_INFO_XXX; false si el SDK aún no recibió ninguna.</summary>
+    public static bool ConsultarEstadoAutonomo(IntPtr handle, out long errores, out long info) =>
+        CP_Printer_GetPrinterStatusInfo(handle, out errores, out info, out _) != 0;
+
+    /// <summary>Bytes que la impresora ha recibido en total (para comparar con los enviados) y el id de la última página impresa.</summary>
+    public static bool ConsultarContadores(IntPtr handle, out uint bytesRecibidos, out uint paginaImpresa)
+    {
+        paginaImpresa = 0;
+        var ok = CP_Printer_GetPrinterReceivedInfo(handle, out bytesRecibidos, out _) != 0;
+        ok &= CP_Printer_GetPrinterPrintedInfo(handle, out paginaImpresa, out _) != 0;
+        return ok;
+    }
+
+    /// <summary>Limpia el error latente de la impresora (atasco resuelto, tapa cerrada) para poder reintentar sin reiniciarla.</summary>
+    public static bool LimpiarError(IntPtr handle) => CP_Printer_ClearPrinterError(handle) != 0;
+
+    /// <summary>Descarta lo pendiente en el buffer de la impresora (un trabajo a medias de una falla anterior).</summary>
+    public static bool LimpiarBuffer(IntPtr handle) => CP_Printer_ClearPrinterBuffer(handle) != 0;
+
+    // Máscaras de CP_PRINTERSTATUS_ERROR_XXX / CP_PRINTERSTATUS_INFO_XXX (autoreplyprint.h).
+    public static string DescribirErrores(long errores)
+    {
+        var problemas = new List<string>();
+        if ((errores & 0x01) != 0) problemas.Add("cortador");
+        if ((errores & 0x02) != 0) problemas.Add("flash");
+        if ((errores & 0x04) != 0) problemas.Add("sin papel");
+        if ((errores & 0x08) != 0) problemas.Add("voltaje");
+        if ((errores & 0x10) != 0) problemas.Add("marca de papel");
+        if ((errores & 0x20) != 0) problemas.Add("motor de impresión");
+        if ((errores & 0x40) != 0) problemas.Add("sobrecalentamiento");
+        if ((errores & 0x80) != 0) problemas.Add("tapa abierta");
+        if ((errores & 0x100) != 0) problemas.Add("motor");
+        return problemas.Count == 0 ? "sin errores" : string.Join(", ", problemas);
+    }
+
+    public static bool ImpresoraOciosa(long info) => (info & 0x40) != 0; // CP_PRINTERSTATUS_INFO_PRINTIDLE
+    public static bool HayDatosPendientes(long info) => (info & 0x08) != 0; // CP_PRINTERSTATUS_INFO_HAVEDATA
 
     public static string DescribirEstado(int rtstatus)
     {

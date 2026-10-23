@@ -297,11 +297,71 @@ public static partial class HardwareTests
         r.Finalizar();
     }
 
+    // Chequeo previo a imprimir, pensado para el flujo productivo: no se entrega un ticket a una impresora con error
+    // (el cliente ya pagó/recibió efectivo y espera el comprobante). Si hay un error latente intenta limpiarlo una vez
+    // (ClearPrinterError) antes de rendirse. Devuelve false solo si la impresora reporta un error que persiste;
+    // la falta de respuesta de estado se avisa y no bloquea (el SDK no garantiza esos datos, ver Ping).
+    private static bool ImpresoraLista(Reporte r, IntPtr h)
+    {
+        var firmware = AutoReplyPrintSdk.VersionFirmware(h);
+        Consola.Info($"        Firmware: {firmware ?? "(sin respuesta)"}");
+
+        // En autoreply la impresora manda su estado sola; puede tardar un instante tras abrir el puerto.
+        long errores = 0, info = 0;
+        var hayEstado = false;
+        for (var intento = 0; intento < 5 && !hayEstado; intento++)
+        {
+            hayEstado = AutoReplyPrintSdk.ConsultarEstadoAutonomo(h, out errores, out info);
+            if (!hayEstado) Thread.Sleep(200);
+        }
+
+        if (hayEstado && errores != 0)
+        {
+            Consola.Aviso($"        Error reportado por la impresora: {AutoReplyPrintSdk.DescribirErrores(errores)}. Se intenta limpiar.");
+            AutoReplyPrintSdk.LimpiarError(h);
+            Thread.Sleep(500);
+            AutoReplyPrintSdk.ConsultarEstadoAutonomo(h, out errores, out info);
+        }
+
+        if (hayEstado)
+        {
+            if (!r.Criterio("Impresora sin errores antes de imprimir (CP_Printer_GetPrinterStatusInfo)", errores == 0,
+                    AutoReplyPrintSdk.DescribirErrores(errores)))
+                return false;
+        }
+        else
+        {
+            Consola.Aviso("        Sin estado autónomo de la impresora (se continúa con QueryRTStatus).");
+        }
+
+        if (AutoReplyPrintSdk.ConsultarEstado(h, 1000, out var rt))
+        {
+            Consola.Info($"        Estado en tiempo real: {AutoReplyPrintSdk.DescribirEstado(rt)}");
+            if (!r.Criterio("Sin papel/tapa/cortador reportado antes de imprimir (QueryRTStatus)",
+                    !(AutoReplyPrintSdk.SinPapel(rt) || AutoReplyPrintSdk.TapaAbierta(rt) || AutoReplyPrintSdk.ErrorCortador(rt)),
+                    AutoReplyPrintSdk.DescribirEstado(rt)))
+                return false;
+            if (AutoReplyPrintSdk.PapelPorAgotarse(rt))
+                Consola.Aviso("        Papel por agotarse: imprime, pero hay que reponer el rollo pronto.");
+        }
+        else
+        {
+            Consola.Aviso("        Sin respuesta de QueryRTStatus (se continúa).");
+        }
+
+        return true;
+    }
+
     // Imprime el voucher con un handle ya abierto y lo cierra al terminar.
     private static void ImprimirVoucherEnHandle(Reporte r, ImpresoraConfig cfg, IntPtr h)
     {
         try
         {
+            if (!ImpresoraLista(r, h)) return;
+
+            // Un trabajo a medias de una falla anterior saldría pegado a este ticket.
+            AutoReplyPrintSdk.LimpiarBuffer(h);
+            AutoReplyPrintSdk.ConsultarContadores(h, out _, out var paginaAntes);
             AutoReplyPrintSdk.Reset(h);
 
             // Datos de muestra: una operación de compra de dólares consistente con los casetes reales
@@ -371,6 +431,16 @@ public static partial class HardwareTests
 
             var salioImpreso = AutoReplyPrintSdk.ConsultarResultadoImpresion(h, 3000);
             r.Criterio("El SDK confirma que el ticket se imprimió (QueryPrintResult)", salioImpreso);
+
+            // Segunda confirmación independiente: el id de la última página impresa que reporta la impresora avanzó.
+            if (AutoReplyPrintSdk.ConsultarContadores(h, out var bytes, out var paginaDespues))
+            {
+                Consola.Info($"        Bytes recibidos por la impresora: {bytes} | página impresa: {paginaAntes} -> {paginaDespues}");
+                r.Criterio("La impresora reporta una página nueva impresa", paginaDespues != paginaAntes);
+            }
+
+            if (AutoReplyPrintSdk.ConsultarEstadoAutonomo(h, out var erroresFinal, out _))
+                r.Criterio("Impresora sin errores después de imprimir", erroresFinal == 0, AutoReplyPrintSdk.DescribirErrores(erroresFinal));
         }
         finally { AutoReplyPrintSdk.Cerrar(h); }
     }

@@ -14,7 +14,7 @@
     <!-- Carpeta 'dll' del SDK de GRG (DLL + .ini + dependencias). Se copia completa junto al .exe. -->
     <GrgSdkDir Condition="'$(GrgSdkDir)' == ''">$(MSBuildProjectDirectory)\referencias_integracion\CRM9250NDev_V2.3.7.6\dll\</GrgSdkDir>
     <!-- autoreplyprint.dll nativa (win32) del SDK de la impresora KP-80A, usada solo en modo Impresora.Modo=UsbSdk. -->
-    <PrinterSdkDir Condition="'$(PrinterSdkDir)' == ''">$(MSBuildProjectDirectory)\referencias_integracion\Receipt Printer(KP-80A)\autoreplyprint_dll_win32\</PrinterSdkDir>
+    <PrinterSdkDir Condition="'$(PrinterSdkDir)' == ''">$(MSBuildProjectDirectory)\referencias_integracion\printer\autoreplyprint.c\dll\win32\</PrinterSdkDir>
     <!-- TWRPassportAPI.dll y sus dependencias (SDK del lector MEPR500+), usadas solo con Escaner.Simulado=false. -->
     <ScannerSdkDir Condition="'$(ScannerSdkDir)' == ''">$(MSBuildProjectDirectory)\referencias_integracion\Passport scanner(MEPR500+)\MEPR500 Windows SDK 20230815\BinTW-20230815 DEMO\</ScannerSdkDir>
   </PropertyGroup>

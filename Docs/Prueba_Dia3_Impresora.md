@@ -773,6 +773,8 @@ HardwareTests.Test_ImprimirVoucherOperacion();
 | I-06 | Con la tapa abierta o sin papel la prueba falla de forma controlada (sin colgar el programa) | Prueba negativa opcional |
 | I-07 | Modo UsbSdk: antes de imprimir no reporta sin papel / tapa abierta / error de cortador | Criterio automático (`CP_Pos_QueryRTStatus`) |
 | I-08 | Modo UsbSdk: el SDK confirma que el ticket se imprimió, no solo que se envió | Criterio automático (`CP_Pos_QueryPrintResult`) |
+| I-13 | Opción 26 (SDK): antes de imprimir la impresora no reporta errores (`CP_Printer_GetPrinterStatusInfo`); si hay un error latente se intenta `ClearPrinterError` una vez y, si persiste, **no se imprime** | Criterio automático |
+| I-14 | Opción 26 (SDK): después de imprimir, el id de página impresa que reporta la impresora cambió y no quedó ningún error | Criterio automático (`GetPrinterPrintedInfo`) |
 | I-10 | El logo (`RutaLogo`) se encuentra en disco y se arma el comando de imagen sin excepción (`CP_Pos_PrintRasterImageFromFile` en UsbSdk, `GS v 0`/`ImagenDesdeArchivo` en Spooler/Serial) | Criterio automático |
 | I-11 | El asistente ve el logo de FINSO legible arriba del ticket | Inspección del voucher |
 | I-12 | El asistente ve los datos de la operación con formato de voucher tradicional (fecha, operación, montos, denominaciones, tipo de cambio, comisión, identificación, terminal, folio) | Inspección del voucher |
