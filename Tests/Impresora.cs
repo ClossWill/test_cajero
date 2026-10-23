@@ -251,7 +251,55 @@ public static partial class HardwareTests
         var h = AutoReplyPrintSdk.Abrir(cfg.NombreUsb);
         if (!r.Criterio($"Apertura de impresora USB '{cfg.NombreUsb}' vía SDK (autoreply)", AutoReplyPrintSdk.EsValido(h)))
             return;
+        ImprimirVoucherEnHandle(r, cfg, h);
+    }
 
+    /// <summary>
+    /// Opción de menú propia del SDK del fabricante (autoreplyprint.dll), sin depender de Impresora.Modo: enumera lo que el
+    /// SDK ve (USB y COM), abre la primera impresora que responda (con y sin autoreply) e imprime el voucher de operación.
+    /// </summary>
+    public static void Test_ImprimirVoucherSdk()
+    {
+        var cfg = HardwareConfig.Actual.Impresora;
+        var r = new Reporte("Impresora KP-80A - Voucher de operación por SDK (autoreplyprint.dll)");
+        try
+        {
+            Consola.Info($"        SDK autoreplyprint versión {AutoReplyPrintSdk.Version()}");
+            var usb = AutoReplyPrintSdk.EnumerarUsb();
+            var com = AutoReplyPrintSdk.EnumerarCom();
+            Consola.Info($"        USB que ve el SDK: {(usb.Count == 0 ? "(ninguna)" : string.Join(" | ", usb))}");
+            Consola.Info($"        COM que ve el SDK: {(com.Count == 0 ? "(ninguno)" : string.Join(" | ", com))}");
+
+            // Primero lo que el SDK enumeró, luego el nombre de hardware.json: con una sola impresora USB el SDK abre
+            // la que encuentre aunque el nombre sea cualquier texto.
+            var nombres = usb.Append(cfg.NombreUsb).Distinct().ToList();
+            var h = IntPtr.Zero;
+            foreach (var nombre in nombres)
+            {
+                foreach (var autoreply in new[] { true, false })
+                {
+                    h = AutoReplyPrintSdk.AbrirUsb(nombre, autoreply);
+                    var ok = AutoReplyPrintSdk.EsValido(h);
+                    Consola.Info($"        Abrir USB '{nombre}' autoreply={(autoreply ? "sí" : "no")}: {(ok ? "OK" : "falló")}");
+                    if (ok) break;
+                }
+                if (AutoReplyPrintSdk.EsValido(h)) break;
+            }
+
+            if (!r.Criterio("Apertura de la impresora vía SDK", AutoReplyPrintSdk.EsValido(h),
+                    "Si falla con USB: el SDK solo abre si Windows la ve como 'USB Printing Support'; ver Docs/Prueba_Dia3_Impresora.md"))
+            { r.Finalizar(); return; }
+
+            ImprimirVoucherEnHandle(r, cfg, h);
+        }
+        catch (DllNotFoundException ex) { r.Criterio("autoreplyprint.dll disponible junto al .exe", false, ex.Message); }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
+    // Imprime el voucher con un handle ya abierto y lo cierra al terminar.
+    private static void ImprimirVoucherEnHandle(Reporte r, ImpresoraConfig cfg, IntPtr h)
+    {
         try
         {
             AutoReplyPrintSdk.Reset(h);

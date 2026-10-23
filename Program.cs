@@ -42,6 +42,7 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
         ("6", "Voucher de prueba",        HardwareTests.Test_ImprimirVoucherPrueba),
         ("14", "Voucher de operación (logo + formato tradicional)", HardwareTests.Test_ImprimirVoucherOperacion),
         ("15", "Ping (conexión, sin imprimir)", HardwareTests.Test_PingImpresora),
+        ("26", "Voucher de operación por SDK del fabricante (autoreplyprint.dll)", HardwareTests.Test_ImprimirVoucherSdk),
     }),
     ("Sensores", new (string Clave, string Texto, Action Accion)[]
     {

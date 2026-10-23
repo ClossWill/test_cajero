@@ -66,6 +66,18 @@ public static class AutoReplyPrintSdk
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern int CP_Pos_SetTextScale(IntPtr handle, int nWidthScale, int nHeightScale);
 
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr CP_Library_Version();
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern uint CP_Port_EnumUsb(byte[] pBuf, uint cbBuf, out uint pcbNeeded);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern uint CP_Port_EnumCom(byte[] pBuf, uint cbBuf, out uint pcbNeeded);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Port_IsOpened(IntPtr handle);
+
     public const int AlineacionIzquierda = 0;
     public const int AlineacionCentro = 1;
     public const int AlineacionDerecha = 2;
@@ -104,6 +116,33 @@ public static class AutoReplyPrintSdk
         var nombre = puerto.StartsWith(@"\\.\", StringComparison.Ordinal) ? puerto : @"\\.\" + puerto;
         return CP_Port_OpenCom(nombre, baudios, databits: 8, parity: 0, stopbits: 0, flowcontrol: 0, autoreplymode: 1);
     }
+
+    /// <summary>Igual que <see cref="Abrir"/> pero eligiendo el modo autoreply: el .h avisa que solo algunos modelos lo
+    /// soportan, así que el diagnóstico prueba con y sin él.</summary>
+    public static IntPtr AbrirUsb(string nombre, bool autoreply) => CP_Port_OpenUsb(nombre, autoreply ? 1 : 0);
+
+    public static string Version() => Marshal.PtrToStringAnsi(CP_Library_Version()) ?? "(desconocida)";
+
+    /// <summary>Nombres de las impresoras USB que ve el SDK (CP_Port_EnumUsb).</summary>
+    public static List<string> EnumerarUsb() => Enumerar(CP_Port_EnumUsb);
+
+    /// <summary>Puertos COM que ve el SDK (CP_Port_EnumCom).</summary>
+    public static List<string> EnumerarCom() => Enumerar(CP_Port_EnumCom);
+
+    private delegate uint EnumFn(byte[] buf, uint cb, out uint needed);
+
+    // El .h no documenta el formato del buffer; se leen las cadenas ANSI separadas por '\0' (o por salto de línea).
+    private static List<string> Enumerar(EnumFn fn)
+    {
+        var buf = new byte[4096];
+        var n = fn(buf, (uint)buf.Length, out _);
+        if (n == 0) return new List<string>();
+        return System.Text.Encoding.Default.GetString(buf)
+            .Split(new[] { '\0', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.Trim()).Where(t => t.Length > 0).ToList();
+    }
+
+    public static bool EstaAbierto(IntPtr handle) => EsValido(handle) && CP_Port_IsOpened(handle) != 0;
 
     public static bool EsValido(IntPtr handle) => handle != IntPtr.Zero;
 
