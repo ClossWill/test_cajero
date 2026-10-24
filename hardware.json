@@ -77,7 +77,10 @@
     "BaudRate": 19200,
     "Canales": 18,
     "PerifericosEsperados": 5, // recibo, moneda, pasaporte, QR, efectivo; la prueba se detiene al identificarlos
-    "SegundosPausaBarrido": 60 // cada canal queda encendido este tiempo en el barrido (18 canales x 60 s = 18 min)
+    "SegundosPausaBarrido": 60, // cada canal queda encendido este tiempo en el barrido
+    // Observado en el gabinete (2026-10-23): OUT -> ícono que enciende. El resto de canales no tiene ícono conectado.
+    "Indicadores": { "1": "Impresora", "2": "Monedas", "3": "Pasaporte", "4": "QR", "5": "Recicladora" },
+    "BarrerTodosLosCanales": false // true = recorre los 18 canales (18 min) para re-explorar
   },
   "Camara": {
     // Item 12 del BEEX (GDZS-DC004-MG3021): webcam USB estándar, sin SDK propio.

@@ -50,8 +50,13 @@ public static partial class HardwareTests
             {
                 for (byte canal = 1; canal <= cfg.Canales; canal++)
                 {
+                    cfg.Indicadores.TryGetValue(canal, out var nombre);
+                    if (nombre is null && cfg.Indicadores.Count > 0 && !cfg.BarrerTodosLosCanales) continue;
+
                     var ok = bus.Encender(canal);
-                    Consola.Info($"        >> OUT{canal} ENCENDIDO ({canal}/{cfg.Canales}): anote qué ícono/luz es");
+                    Consola.Info(nombre is null
+                        ? $"        >> OUT{canal} ENCENDIDO ({canal}/{cfg.Canales}): anote qué ícono/luz es"
+                        : $"        >> OUT{canal} ENCENDIDO ({canal}/{cfg.Canales}): debe iluminar {nombre}");
                     EsperarBarrido(cfg.SegundosPausaBarrido);
                     ok &= bus.Apagar(canal);
                     Consola.Info($"        OUT{canal} apagado");

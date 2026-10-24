@@ -144,6 +144,10 @@ public sealed class LedsConfig
     public int PerifericosEsperados { get; set; } = 5;
     // Segundos que cada canal permanece encendido durante el barrido, para dar tiempo a identificar su ícono y anotarlo.
     public int SegundosPausaBarrido { get; set; } = 60;
+    // Canal (OUT n) -> periférico que ilumina, anotado por observación directa del barrido (2026-10-23).
+    public Dictionary<int, string> Indicadores { get; set; } = new();
+    // false = el barrido solo recorre los canales de Indicadores (si hay); true = recorre los 18 para re-explorar.
+    public bool BarrerTodosLosCanales { get; set; } = false;
 }
 
 // Item 12 del BEEX (GDZS-DC004-MG3021): cámara USB estándar, detectada por Windows sin driver propio.
