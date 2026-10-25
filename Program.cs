@@ -29,7 +29,8 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
         ("24", "Dispensar dólares USD",   () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa("USD"))),
         ("20", "Abrir shutter (control manual)",    HardwareTests.Test_AbrirShutter),
         ("21", "Cerrar shutter (control manual)",   HardwareTests.Test_CerrarShutter),
-        ("22", "Consultar inventario (solo lectura)", HardwareTests.Test_ConsultarInventario),
+        ("22", "Estado de casetes (presencia/status, solo lectura)", HardwareTests.Test_ConsultarEstadoCasetes),
+        ("27", "Conteo de billetes por casete (solo lectura)", HardwareTests.Test_ConsultarConteoCasetes),
     }),
     ("Monederos", new (string Clave, string Texto, Action Accion)[]
     {

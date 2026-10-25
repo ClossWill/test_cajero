@@ -15,6 +15,13 @@ internal static class Crm9250NExtra
     [DllImport("CRM9250NDev.dll", EntryPoint = "iGetCassetteInfoEx")]
     public static extern int iGetCassetteInfoEx(IntPtr p_hDevHandle, IntPtr p_psCassetteInfo, IntPtr p_psCassetteStatus, IntPtr p_psStatus);
 
+    /// <summary>
+    /// Cantidad de billetes por denominación de un casete (PDF §4.28). p_iCassetteNo: 0 AC1, 1-10 RC1-RC10, 11 LRB, 12 AC2, 13-18 RC11-RC16.
+    /// p_piDenomCount es entrada/salida: capacidad del arreglo al llamar, entradas llenas al volver. Sin efectos físicos.
+    /// </summary>
+    [DllImport("CRM9250NDev.dll", EntryPoint = "iGetCassetteDenomDetailsEx")]
+    public static extern int iGetCassetteDenomDetailsEx(IntPtr p_hDevHandle, int p_iCassetteNo, IntPtr p_piDenomCount, IntPtr p_psDenomDetails, IntPtr p_psStatus);
+
     /// <summary>Lee las monedas/denominaciones que soporta el validador NV (PDF §4.22). Sin efectos físicos.</summary>
     [DllImport("CRM9250NDev.dll", EntryPoint = "iGetDenominationTable")]
     public static extern int iGetDenominationTable(IntPtr p_hDevHandle, IntPtr p_psDenominationTable, IntPtr p_psStatus);
@@ -34,6 +41,15 @@ internal static class Crm9250NExtra
     /// <summary>Libera el handle; es el último paso (PDF §4.2).</summary>
     [DllImport("CRM9250NDev.dll", EntryPoint = "vCloseLogicDevice")]
     public static extern void vCloseLogicDevice(IntPtr p_hDevHandle);
+}
+
+/// <summary>tCRM9250N_DenomDetails (PDF §3.27). byNoteType: 2 genuino (FIT), 3 L2, 4 L3, 5 L4B. Pack = 1 por consistencia con el resto; POR CONFIRMAR con el primer resultado real.</summary>
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+internal struct tCRM9250N_DenomDetails
+{
+    public ushort wDenomCode;
+    public int iNoteCount;
+    public byte byNoteType;
 }
 
 /// <summary>tCRM9250N_DenominationInfo (PDF §3.17). wDenomCode = ID que espera awAcceptableDenom.</summary>

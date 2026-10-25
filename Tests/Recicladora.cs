@@ -443,13 +443,12 @@ public static partial class HardwareTests
 
     /// <summary>
     /// Consulta de solo lectura (no mueve nada): presencia/estado por casete (iGetCassetteInfoEx) cruzado con la
-    /// denominación configurada en hardware.json. El SDK no expone un conteo de billetes en vivo por casete (solo
-    /// presencia/estado); para el inventario real hay que conciliar contra los contadores de depósito/dispensa
-    /// (ver Test_AceptarBilletes/Test_DispensarBilletes) y el conteo físico del asistente.
+    /// denominación configurada en hardware.json. No da cantidad de billetes: para eso está
+    /// <see cref="Test_ConsultarConteoCasetes"/> (iGetCassetteDenomDetailsEx).
     /// </summary>
-    public static void Test_ConsultarInventario()
+    public static void Test_ConsultarEstadoCasetes()
     {
-        var r = new Reporte("Recicladora GRG 9250N - Consultar inventario (solo lectura)");
+        var r = new Reporte("Recicladora GRG 9250N - Estado de casetes (solo lectura)");
         try
         {
             if (_crm == IntPtr.Zero && !InicializarRecicladora(r)) { r.Finalizar(); return; }
@@ -485,8 +484,53 @@ public static partial class HardwareTests
             if (estado.sAtcStatus.byExist != 0)
                 Consola.Info($"        ATC: presente=1 status={estado.sAtcStatus.byStatus}");
             Consola.Info($"        LRB: presente={estado.sLrbStatus.byExist}");
-            Consola.Aviso("        El SDK no reporta cantidad de billetes por casete en esta llamada; " +
-                          "confirmar conteo físico visualmente si se requiere inventario exacto.");
+            Consola.Aviso("        Esta llamada no reporta cantidad de billetes; para eso usar la opción 27 (conteo por casete).");
+        }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
+    /// <summary>
+    /// Consulta de solo lectura (no mueve nada): cantidad de billetes por denominación de cada casete configurado en
+    /// hardware.json (iGetCassetteDenomDetailsEx, API GRG §4.28). No está confirmado si iNoteCount es un conteo físico o
+    /// un contador lógico del equipo: contrastar con una carga conocida y volver a consultar tras sacar/meter el casete.
+    /// </summary>
+    public static void Test_ConsultarConteoCasetes()
+    {
+        const int CapacidadEntradas = 16;
+        var r = new Reporte("Recicladora GRG 9250N - Conteo de billetes por casete (solo lectura)");
+        try
+        {
+            if (_crm == IntPtr.Zero && !InicializarRecicladora(r)) { r.Finalizar(); return; }
+
+            var tamEntrada = System.Runtime.InteropServices.Marshal.SizeOf<tCRM9250N_DenomDetails>();
+            Consola.Info($"        Tamaño de tCRM9250N_DenomDetails con Pack=1: {tamEntrada} bytes (esperado 7; si el SDK no empaqueta serían 12)");
+            foreach (var cassette in Crm.Casetes.OrderBy(c => c.Indice))
+            {
+                using var s = new NativeScope();
+                var pStatus = s.Salida<tDevReturn>();
+                var pCantidad = s.Entrada(CapacidadEntradas);
+                var pDetalle = s.Bloque(tamEntrada * CapacidadEntradas);
+                var etiqueta = $"RC{cassette.Indice} {cassette.Nombre} (hardware.json: {cassette.Moneda} {cassette.Denominacion})";
+                if (!CrmOk(r, $"iGetCassetteDenomDetailsEx RC{cassette.Indice}",
+                        Crm9250NExtra.iGetCassetteDenomDetailsEx(_crm, cassette.Indice, pCantidad, pDetalle, pStatus), pStatus))
+                    continue;
+
+                var entradas = Math.Clamp(System.Runtime.InteropServices.Marshal.ReadInt32(pCantidad), 0, CapacidadEntradas);
+                var total = 0;
+                if (entradas == 0) Consola.Info($"        {etiqueta}: sin denominaciones reportadas");
+                for (var i = 0; i < entradas; i++)
+                {
+                    var d = Native.Leer<tCRM9250N_DenomDetails>(IntPtr.Add(pDetalle, i * tamEntrada));
+                    total += d.iNoteCount;
+                    var nombre = Crm.EtiquetaDenominacion.GetValueOrDefault(d.wDenomCode, "sin etiqueta");
+                    Consola.Info($"        {etiqueta}: código={d.wDenomCode} (0x{d.wDenomCode:X4}, {nombre}) " +
+                                 $"tipo={d.byNoteType} billetes={d.iNoteCount}");
+                }
+                if (entradas > 0)
+                    Consola.Info($"        {etiqueta}: TOTAL {total} billetes = {cassette.Moneda} {(long)total * cassette.Denominacion:N0} " +
+                                 "(cantidad x denominación de hardware.json)");
+            }
         }
         catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
         r.Finalizar();
