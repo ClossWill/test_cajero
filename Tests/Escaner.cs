@@ -5,7 +5,8 @@ using IntegracionCajeroPruebas.Protocolos;
 namespace IntegracionCajeroPruebas.Tests;
 
 public sealed record DocumentoLeido(string Nombre, string NumeroDocumento, string Nacionalidad,
-    string FechaNacimiento, string FechaVencimiento, bool ChecksumValido, string? Mrz);
+    string FechaNacimiento, string FechaVencimiento, bool ChecksumValido, string? Mrz,
+    string? ImagenColor = null, string? ImagenIR = null, string? ImagenUV = null);
 
 /// <summary>Frontera con el SDK propietario del MEPR500+. Solo lo que la prueba necesita.</summary>
 public interface IEscanerSdk : IDisposable
@@ -27,6 +28,7 @@ public sealed class EscanerMeprSdk : IEscanerSdk
 
     private readonly ManualResetEventSlim _capturado = new(initialState: false);
     private PassportInfo _ultimo;
+    private DocDataEX _ultimoDatos;
 
     public void Inicializar()
     {
@@ -38,9 +40,10 @@ public sealed class EscanerMeprSdk : IEscanerSdk
                 "(carpeta BinTW-20230815 DEMO) estén junto al .exe.");
     }
 
-    private void OnDocumentoCapturado(PassportInfo info)
+    private void OnDocumentoCapturado(PassportInfo info, DocDataEX datos)
     {
         _ultimo = info;
+        _ultimoDatos = datos;
         _capturado.Set();
     }
 
@@ -56,8 +59,15 @@ public sealed class EscanerMeprSdk : IEscanerSdk
         var mrz = string.Join('\n', new[] { _ultimo.chMRZ1, _ultimo.chMRZ2, _ultimo.chMRZ3 }
             .Where(linea => !string.IsNullOrWhiteSpace(linea)));
         return new DocumentoLeido(nombre, _ultimo.PassportNo, _ultimo.Nationality,
-            _ultimo.BirthDate, _ultimo.ExpiryDate, _ultimo.bCheckSum, mrz.Length == 0 ? null : mrz);
+            _ultimo.BirthDate, _ultimo.ExpiryDate, _ultimo.bCheckSum, mrz.Length == 0 ? null : mrz,
+            ResolverRuta(_ultimoDatos.ColorFileName), ResolverRuta(_ultimoDatos.IRFileName),
+            ResolverRuta(_ultimoDatos.UVFileName));
     }
+
+    // El SDK deja las imágenes en disco y solo entrega su ruta (como hace el demo IDRead/Form1.cs, que las abre
+    // con FileStream); si viene relativa se interpreta contra la carpeta del .exe (Program.cs fija ese cwd).
+    private static string? ResolverRuta(string? ruta) =>
+        string.IsNullOrWhiteSpace(ruta) ? null : Path.GetFullPath(ruta.Trim());
 
     public void Dispose()
     {
@@ -73,8 +83,15 @@ public sealed class EscanerSimulado : IEscanerSdk
     public string Descripcion => "SIMULADO (sin hardware)";
     public void Inicializar() { }
     public bool EsperarDocumento(TimeSpan timeout) => true;
-    public DocumentoLeido Leer() => new("PRUEBA SIMULADA", "X0000000", "MEX", "900101", "300101", true,
-        "P<MEXPRUEBA<SIMULADA<<<<<<<<<<<<<<<<<<<<<<<<");
+    public DocumentoLeido Leer()
+    {
+        // PNG de 1x1 píxel, solo para ejercitar el guardado de la imagen sin hardware.
+        var ruta = Path.Combine(Path.GetTempPath(), "escaner_simulado.png");
+        File.WriteAllBytes(ruta, Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg=="));
+        return new("PRUEBA SIMULADA", "X0000000", "MEX", "900101", "300101", true,
+            "P<MEXPRUEBA<SIMULADA<<<<<<<<<<<<<<<<<<<<<<<<", ruta);
+    }
     public void Dispose() { }
 }
 
@@ -95,6 +112,30 @@ public static partial class HardwareTests
         }
         catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
         r.Finalizar();
+    }
+
+    /// <summary>
+    /// Copia la imagen que dejó el SDK a la carpeta de capturas (el SDK puede reutilizar/borrar el archivo en la
+    /// siguiente lectura). La de color es la imagen escaneada del documento y es criterio; IR/UV solo se guardan
+    /// si el lector las entregó.
+    /// </summary>
+    private static void GuardarImagen(Reporte r, string tipo, string? origen, string carpeta, bool obligatoria)
+    {
+        if (origen is null || !File.Exists(origen))
+        {
+            if (obligatoria)
+                r.Criterio($"Imagen {tipo} del documento guardada", false,
+                    origen is null ? "el SDK no entregó ruta de imagen" : $"no existe el archivo {origen}");
+            return;
+        }
+
+        Directory.CreateDirectory(carpeta);
+        var destino = Path.GetFullPath(Path.Combine(carpeta,
+            $"documento_{tipo}_{DateTime.Now:yyyyMMdd_HHmmss}{Path.GetExtension(origen)}"));
+        File.Copy(origen, destino, overwrite: true);
+        var bytes = new FileInfo(destino).Length;
+        Console.WriteLine($"  Imagen {tipo,-12}: {destino} ({bytes} bytes)");
+        if (obligatoria) r.Criterio($"Imagen {tipo} del documento guardada (> 0 bytes)", bytes > 0);
     }
 
     public static void Test_EscanearDocumento()
@@ -128,6 +169,10 @@ public static partial class HardwareTests
                 // único criterio automático que garantiza que lo leído corresponde de verdad al documento, sin
                 // depender de que el asistente lo compare a ojo.
                 r.Criterio("Dígito verificador de la MRZ válido (bCheckSum del SDK)", doc.ChecksumValido);
+
+                GuardarImagen(r, "color", doc.ImagenColor, cfg.CarpetaCapturas, obligatoria: true);
+                GuardarImagen(r, "infrarroja", doc.ImagenIR, cfg.CarpetaCapturas, obligatoria: false);
+                GuardarImagen(r, "ultravioleta", doc.ImagenUV, cfg.CarpetaCapturas, obligatoria: false);
             }
         }
         catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }

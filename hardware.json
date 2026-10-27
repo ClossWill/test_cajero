@@ -48,7 +48,8 @@
   },
   "Escaner": {
     "Simulado": false,                       // cambiado a false el 2026-10-16 para probar Test_PingEscaner contra el lector real (el "OK" anterior fue del stub simulado)
-    "TimeoutSegundos": 30
+    "TimeoutSegundos": 30,
+    "CarpetaCapturas": "C:\\Users\\1\\Pictures" // aquí se copia la imagen escaneada (color, y IR/UV si el SDK las entrega)
   },
   "Impresora": {
     "Modo": "Spooler",                       // vuelto a Spooler el 2026-10-17: el SDK (UsbSdk) no se pudo destrabar en esta máquina; logo y tamaños de fuente ahora se arman con ESC/POS crudo (ver EscPos.cs), no dependen del SDK

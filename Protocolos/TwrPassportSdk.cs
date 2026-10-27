@@ -110,7 +110,7 @@ public static class TwrPassportSdk
     private static PassportInfoCallback? _callback;
 
     /// <summary>Se dispara en un hilo propio de la DLL nativa cada vez que detecta y captura un documento.</summary>
-    public static event Action<PassportInfo>? DocumentoCapturado;
+    public static event Action<PassportInfo, DocDataEX>? DocumentoCapturado;
 
     /// <param name="velocidad">1 = Full speed, 2 = High speed (según TWRPassportAPI.h). El demo usa 2.</param>
     public static bool Inicializar(int velocidad = 2)
@@ -123,7 +123,8 @@ public static class TwrPassportSdk
         // por eso se agrega por si el SDK la necesita para dejar el subsistema completo listo.
         TW_InitIDCard("", new int[5]);
 
-        _callback = (_, _, info) => DocumentoCapturado?.Invoke(info);
+        // DocDataEX trae las rutas de las imágenes que el SDK ya dejó en disco (color, IR, UV) al disparar el callback.
+        _callback = (_, datos, info) => DocumentoCapturado?.Invoke(info, datos);
         TW_Capture_RegisterCallbackResultImageEX(_callback, IntPtr.Zero);
 
         if (!TW_SetCapture_Start()) return false;

@@ -110,6 +110,7 @@ public sealed class EscanerConfig
 {
     public bool Simulado { get; set; } = true;
     public int TimeoutSegundos { get; set; } = 30;
+    public string CarpetaCapturas { get; set; } = @"C:\Users\1\Pictures";
 }
 
 public sealed class ImpresoraConfig
