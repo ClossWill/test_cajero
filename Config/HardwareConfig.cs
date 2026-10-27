@@ -154,6 +154,6 @@ public sealed class LedsConfig
 // Item 12 del BEEX (GDZS-DC004-MG3021): cámara USB estándar, detectada por Windows sin driver propio.
 public sealed class CamaraConfig
 {
-    public int IndiceDispositivo { get; set; } = 0;
-    public string CarpetaCapturas { get; set; } = "Capturas";
+    public int IndiceDispositivo { get; set; } = 1;
+    public string CarpetaCapturas { get; set; } = @"C:\Users\1\Pictures";
 }

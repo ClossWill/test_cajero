@@ -85,7 +85,7 @@
   },
   "Camara": {
     // Item 12 del BEEX (GDZS-DC004-MG3021): webcam USB estándar, sin SDK propio.
-    "IndiceDispositivo": 0,
-    "CarpetaCapturas": "Capturas"
+    "IndiceDispositivo": 1, // GDZS-010101-03M-V (visible, a color) en DirectShow; 0 = GDZS-020202-02M-IR (grises)
+    "CarpetaCapturas": "C:\\Users\\1\\Pictures"
   }
 }
