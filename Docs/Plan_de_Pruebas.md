@@ -80,53 +80,104 @@ Console.WriteLine($"Bitácora de la sesión: {Bitacora.Ruta ?? "(desactivada)"}"
 Console.WriteLine($"Proceso de {(Environment.Is64BitProcess ? 64 : 32)} bits | config: {HardwareConfig.RutaArchivo}"
                   + (File.Exists(HardwareConfig.RutaArchivo) ? "" : " (no existe: se usan valores por defecto)"));
 
-var menu = new (string Clave, string Texto, Action Accion)[]
+var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)[] Pruebas)[]
 {
-    ("1", "Recicladora  - Inicializar (conecta, sin movimiento)", () => HardwareTests.Test_InicializarRecicladora()),
-    ("11", "Recicladora - Reinicio mecánico (iPowerOnInitEx, SE MUEVE)", () => HardwareTests.Test_InicializarRecicladora(reinicioMecanico: true)),
-    ("2", "Recicladora  - Aceptar billetes",         () => HardwareTests.Test_AceptarBilletes()),
-    ("3", "Recicladora  - Dispensar billetes",       () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa())),
-    ("10", "Recicladora - Billete inválido (espera rechazo)", () => HardwareTests.Test_AceptarBilletes(esperaRechazo: true)),
-    ("20", "Recicladora - Abrir shutter (control manual)",    HardwareTests.Test_AbrirShutter),
-    ("21", "Recicladora - Cerrar shutter (control manual)",   HardwareTests.Test_CerrarShutter),
-    ("4", "Monederos    - Ping ccTalk",              HardwareTests.Test_PingMonederos),
-    ("5", "Monederos    - Dispensar monedas",        () => HardwareTests.Test_DispensarMonedas(
-                                                         PedirEntero("Monedas de $1", 2), PedirEntero("Monedas de $5", 1))),
-    ("6", "Impresora    - Voucher de prueba",        HardwareTests.Test_ImprimirVoucherPrueba),
-    ("14", "Impresora   - Voucher de operación (logo + formato tradicional)", HardwareTests.Test_ImprimirVoucherOperacion),
-    ("15", "Impresora   - Ping (conexión, sin imprimir)", HardwareTests.Test_PingImpresora),
-    ("7", "Sensores     - Calibrar tramas ALB02",    HardwareTests.Test_CalibrarSensores),
-    ("8", "Sensores     - Escuchar (puerta/vibración)", HardwareTests.Test_EscucharSensores),
-    ("16", "Sensores    - Ping (abre el puerto COM)", HardwareTests.Test_PingSensores),
-    ("9", "Escáner      - Leer documento",           HardwareTests.Test_EscanearDocumento),
-    ("17", "Escáner     - Ping (inicializa SDK, sin leer)", HardwareTests.Test_PingEscaner),
-    ("12", "LEDs        - Control de indicadores (18 canales)", HardwareTests.Test_ControlarLeds),
-    ("18", "LEDs        - Ping (firmware)",          HardwareTests.Test_PingLeds),
-    ("13", "Cámara      - Capturar foto (item 12 BEEX)",         HardwareTests.Test_CapturarRostro),
-    ("19", "Cámara      - Ping (abre el dispositivo)", HardwareTests.Test_PingCamara),
+    ("Recicladora", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("1", "Inicializar (conecta, sin movimiento)", () => HardwareTests.Test_InicializarRecicladora()),
+        ("11", "Reinicio mecánico (iPowerOnInitEx, SE MUEVE)", () => HardwareTests.Test_InicializarRecicladora(reinicioMecanico: true)),
+        ("25", "Configurar (iInitSettingEx, sin movimiento)", HardwareTests.Test_ConfigurarRecicladora),
+        ("2", "Depositar pesos MXN (flujo GRG: abre, espera billetes, cuenta por lotes y guarda)", () => HardwareTests.Test_DepositarBilletes("MXN")),
+        ("23", "Depositar dólares USD (mismo flujo, solo acepta USD)", () => HardwareTests.Test_DepositarBilletes("USD")),
+        ("3", "Dispensar pesos MXN",      () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa("MXN"))),
+        ("24", "Dispensar dólares USD",   () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa("USD"))),
+        ("20", "Abrir shutter (control manual)",    HardwareTests.Test_AbrirShutter),
+        ("21", "Cerrar shutter (control manual)",   HardwareTests.Test_CerrarShutter),
+        ("22", "Estado de casetes (presencia/status, solo lectura)", HardwareTests.Test_ConsultarEstadoCasetes),
+        ("27", "Conteo de billetes por casete (solo lectura)", HardwareTests.Test_ConsultarConteoCasetes),
+    }),
+    ("Monederos", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("4", "Ping ccTalk",              HardwareTests.Test_PingMonederos),
+        ("5", "Dispensar monedas",        () => HardwareTests.Test_DispensarMonedas(
+                                               PedirEntero("Monedas de $1", 2), PedirEntero("Monedas de $5", 1))),
+    }),
+    ("Impresora", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("6", "Voucher de prueba",        HardwareTests.Test_ImprimirVoucherPrueba),
+        ("14", "Voucher de operación (logo + formato tradicional)", HardwareTests.Test_ImprimirVoucherOperacion),
+        ("15", "Ping (conexión, sin imprimir)", HardwareTests.Test_PingImpresora),
+        ("26", "Voucher de operación por SDK del fabricante (autoreplyprint.dll)", HardwareTests.Test_ImprimirVoucherSdk),
+    }),
+    ("Sensores", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("7", "Calibrar tramas ALB02",    HardwareTests.Test_CalibrarSensores),
+        ("8", "Escuchar (puerta/vibración)", HardwareTests.Test_EscucharSensores),
+        ("16", "Ping (abre el puerto COM)", HardwareTests.Test_PingSensores),
+        ("33", "Escuchar entradas por la tarjeta de 18 canales (COM2, CMD 0x32; exploratorio)", HardwareTests.Test_EscucharSensoresTarjeta),
+    }),
+    ("Escáner", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("9", "Leer documento",           HardwareTests.Test_EscanearDocumento),
+        ("17", "Ping (inicializa SDK, sin leer)", HardwareTests.Test_PingEscaner),
+    }),
+    ("Lector QR", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("30", "Leer código QR (activa el lector solo durante la prueba)", HardwareTests.Test_LeerQr),
+        ("31", "Ping (abre el puerto; solo Qr.Modo = Serial)", HardwareTests.Test_PingQr),
+        ("32", "Probar comandos de disparo (candidatos de hardware.json; solo Qr.Modo = Serial)", HardwareTests.Test_ProbarComandosQr),
+    }),
+    ("LEDs", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("12", "Control de indicadores (18 canales)", HardwareTests.Test_ControlarLeds),
+        ("18", "Ping (firmware)",          HardwareTests.Test_PingLeds),
+    }),
+    ("Cámara", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("13", "Capturar foto (item 12 BEEX)",         HardwareTests.Test_CapturarRostro),
+        ("28", "Capturar frame de video (graba 3 s y guarda un frame)", HardwareTests.Test_CapturarFrameVideo),
+        ("29", "Vista previa en vivo (ventana; ESC/Q cierra, S guarda foto)", HardwareTests.Test_VistaPreviaCamara),
+        ("19", "Ping (abre el dispositivo)", HardwareTests.Test_PingCamara),
+    }),
 };
 
 while (true)
 {
     Console.WriteLine();
     Console.WriteLine("========== MENÚ DE PRUEBAS ==========");
-    Console.WriteLine("  --- FASE 1 (foco actual): recicladora de efectivo ---");
-    foreach (var (clave, texto, _) in menu)
-    {
-        if (clave == "4") Console.WriteLine("  --- Fases posteriores (aún no se validan) ---");
-        Console.WriteLine($"  {clave}. {texto}");
-    }
+    for (var i = 0; i < categorias.Length; i++)
+        Console.WriteLine($"  {i + 1}. {categorias[i].Nombre}");
     Console.WriteLine("  0. Salir");
     Console.Write("Opción: ");
 
     var opcion = Console.ReadLine()?.Trim();
     if (opcion == "0" || opcion is null) break;
 
-    var elegida = menu.FirstOrDefault(m => m.Clave == opcion);
-    if (elegida.Accion is null) { Consola.Error("Opción no válida."); continue; }
+    if (!int.TryParse(opcion, out var indice) || indice < 1 || indice > categorias.Length)
+    {
+        Consola.Error("Opción no válida.");
+        continue;
+    }
 
-    try { elegida.Accion(); }
-    catch (Exception ex) { Consola.Error($"Excepción no controlada: {ex.GetType().Name}: {ex.Message}"); }
+    var categoria = categorias[indice - 1];
+    while (true)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"----- {categoria.Nombre} -----");
+        foreach (var (clave, texto, _) in categoria.Pruebas)
+            Console.WriteLine($"  {clave}. {texto}");
+        Console.WriteLine("  0. Volver al menú principal");
+        Console.Write("Opción: ");
+
+        var subopcion = Console.ReadLine()?.Trim();
+        if (subopcion == "0" || subopcion is null) break;
+
+        var elegida = categoria.Pruebas.FirstOrDefault(m => m.Clave == subopcion);
+        if (elegida.Accion is null) { Consola.Error("Opción no válida."); continue; }
+
+        try { elegida.Accion(); }
+        catch (Exception ex) { Consola.Error($"Excepción no controlada: {ex.GetType().Name}: {ex.Message}"); }
+    }
 }
 
 HardwareTests.CerrarRecicladora();
@@ -146,13 +197,14 @@ static string PedirTexto(string pregunta, string porDefecto)
 
 // Arma una orden de dispensa de uno o varios casetes (ej. 500+200+100 MXN juntos) antes de mandarla como una
 // sola llamada atómica a iDispenseEx.
-static (string Moneda, int Denominacion, int Cantidad)[] PedirPedidoDispensa()
+static (string Moneda, int Denominacion, int Cantidad)[] PedirPedidoDispensa(string moneda)
 {
     var pedido = new List<(string Moneda, int Denominacion, int Cantidad)>();
     do
     {
-        var moneda = PedirTexto("Moneda (MXN/USD)", "MXN");
-        var denominacion = PedirEntero("Denominación (500/200/100 MXN, 20 USD)", 100);
+        var denominacion = moneda == "USD"
+            ? PedirEntero("Denominación en USD (20)", 20)
+            : PedirEntero("Denominación en MXN (500/200/100)", 100);
         var cantidad = PedirEntero("Cantidad de billetes de esa denominación", 1);
         pedido.Add((moneda, denominacion, cantidad));
     } while (Consola.Confirmar("¿Agregar otra denominación a la misma orden?"));
@@ -231,6 +283,7 @@ public static class Consola
     public static void Ok(string texto) => Escribir(texto, ConsoleColor.Green);
     public static void Error(string texto) => Escribir(texto, ConsoleColor.Red);
     public static void Aviso(string texto) => Escribir(texto, ConsoleColor.Yellow);
+    public static void Paso(string texto) => Escribir(texto, ConsoleColor.Cyan);
 
     public static void Esperar(string mensaje)
     {
@@ -245,49 +298,6 @@ public static class Consola
         Console.ResetColor();
         var r = Console.ReadLine()?.Trim().ToLowerInvariant();
         return r is "s" or "si" or "sí" or "y";
-    }
-
-    // Pruebas en remoto: el desarrollador opera la consola y un asistente en sitio manipula la máquina.
-    // Las líneas ">> ASISTENTE" se le leen tal cual (teléfono o videollamada); el desarrollador teclea lo que responde.
-
-    /// <summary>Aviso para el asistente que no espera respuesta.</summary>
-    public static void AvisarAsistente(string texto) => Escribir($"  >> ASISTENTE: {texto}", ConsoleColor.Magenta);
-
-    /// <summary>Instrucción física para el asistente. Bloquea hasta que diga "listo".</summary>
-    public static void Asistente(string instruccion)
-    {
-        AvisarAsistente(instruccion);
-        Esperar("     ENTER cuando el asistente diga \"listo\"...");
-    }
-
-    /// <summary>Pregunta de sí/no sobre lo que el asistente ve u oye.</summary>
-    public static bool PreguntarAsistente(string pregunta)
-    {
-        AvisarAsistente(pregunta);
-        return Confirmar("     Respuesta del asistente");
-    }
-
-    /// <summary>Pide un número (p. ej. cuántos billetes ve). Preguntar el número y no confirmar el esperado evita respuestas inducidas.</summary>
-    public static int? PreguntarNumeroAsistente(string pregunta)
-    {
-        AvisarAsistente(pregunta);
-        Console.Write("     Número que dice el asistente: ");
-        return int.TryParse(Console.ReadLine()?.Trim(), out var n) ? n : null;
-    }
-
-    public static string PreguntarTextoAsistente(string pregunta)
-    {
-        AvisarAsistente(pregunta);
-        Console.Write("     Respuesta del asistente: ");
-        return Console.ReadLine()?.Trim() ?? "";
-    }
-
-    /// <summary>Aviso previo a un movimiento mecánico. false = el asistente no está listo y la prueba no debe moverse.</summary>
-    public static bool AntesDeMover(string movimiento)
-    {
-        Escribir($"  !! VA A MOVERSE: {movimiento}", ConsoleColor.Red);
-        AvisarAsistente("manos fuera del shutter y de las bandejas; avise cuando esté listo.");
-        return Confirmar("     ¿El asistente está listo?");
     }
 
     public static string Hex(IEnumerable<byte> bytes) => string.Join(' ', bytes.Select(b => b.ToString("X2")));
@@ -425,6 +435,14 @@ public sealed class NativeScope : IDisposable
         return p;
     }
 
+    /// <summary>Buffer en cero de tamaño libre (arreglos de structs de salida), con la misma holgura.</summary>
+    public IntPtr Bloque(int bytes)
+    {
+        var p = Native.AsignarCero(bytes * Holgura);
+        _punteros.Add(p);
+        return p;
+    }
+
     public void Dispose()
     {
         foreach (var p in _punteros) Marshal.FreeHGlobal(p);
@@ -451,6 +469,14 @@ public sealed class NativeScope : IDisposable
     "DestinoRechazoDispensa": 1,              // byRejectToAc: 1 = AC1, 2 = AC2, 3 = LRB
     "DestinoRechazoDeposito": 1,              // byRejectPos: 1 = AC1, 2 = AC2, 3 = LRB
     "MaxBilletesPrueba": 5,
+    "SegundosRetiroBilletes": 60,             // espera a que retiren lo dispensado; luego cierra el shutter solo
+    "SegundosColocarBilletes": 60,            // depósito: espera a que coloquen billetes tras abrir el shutter
+    "SegundosAcomodoBilletes": 3,             // depósito: margen tras detectar billetes antes de cerrar
+    "MaxLotesDeposito": 10,                   // depósito: tope de conteos por transacción (LimiteDeposito = billetes por conteo)
+    "FamiliaDenominacionPorMoneda": { "MXN": 8, "USD": 3 },  // byte alto del código del NV: 0x08xx = MXN, 0x03xx = USD (por confirmar)
+    "DestinoRetract": 2,                      // byRetractPos de iRetractEx: 1 = LRB, 2 = AC, 3 = NE
+    "IntentosRecuperacion": 3,                // reinicios tras dispensa fallida antes de pedir mantenimiento
+    "ModoValidacionBilletes": 0,              // NOTEVALIDMODE del SDK: 0 = billete real (PRODUCCIÓN), 15 = billete simulado (pruebas)
     // Mapa físico. "Indice" = número RC del SDK, base 1 (RC2 = 2 en la demo). Orden corregido según observación
     // física de la gaveta (2026-10-15): al jalarla, el primero en salir es USD 20, luego MXN 100, 200, 500 y
     // al final el recycler de banda azul. Esto contradice el orden que traía56el TAC_Logical_Tecnica §2 (que
@@ -465,7 +491,8 @@ public sealed class NativeScope : IDisposable
       { "Indice": 4, "Nombre": "Cassette 4", "Moneda": "MXN", "Denominacion": 500 }
     ],
     // Se llena con lo observado en Test_AceptarBilletes: código del SDK -> etiqueta. Ej. "12": "USD 20"
-    "EtiquetaDenominacion": {}
+    // Códigos grabados en cada casete (opción 22, 2026-10-21); la moneda sale del orden RC1..RC4 de arriba, por confirmar con el primer depósito.
+    "EtiquetaDenominacion": { "821": "USD 20", "2135": "MXN 100", "2120": "MXN 200", "2121": "MXN 500" }
   },
   "Monederos": {
     "BaudRate": 9600,
@@ -477,7 +504,8 @@ public sealed class NativeScope : IDisposable
   },
   "Escaner": {
     "Simulado": false,                       // cambiado a false el 2026-10-16 para probar Test_PingEscaner contra el lector real (el "OK" anterior fue del stub simulado)
-    "TimeoutSegundos": 30
+    "TimeoutSegundos": 30,
+    "CarpetaCapturas": "C:\\Users\\1\\Pictures" // aquí se copia la imagen escaneada (color, y IR/UV si el SDK las entrega)
   },
   "Impresora": {
     "Modo": "Spooler",                       // vuelto a Spooler el 2026-10-17: el SDK (UsbSdk) no se pudo destrabar en esta máquina; logo y tamaños de fuente ahora se arman con ESC/POS crudo (ver EscPos.cs), no dependen del SDK
@@ -505,12 +533,33 @@ public sealed class NativeScope : IDisposable
     "Puerto": "COM2", // confirmado en la máquina real (2026-10-16): firmware "ADK LEDBOX V2.0-20240613"
     "BaudRate": 19200,
     "Canales": 18,
-    "PerifericosEsperados": 5 // recibo, moneda, pasaporte, QR, efectivo; la prueba se detiene al identificarlos
+    "PerifericosEsperados": 5, // recibo, moneda, pasaporte, QR, efectivo; la prueba se detiene al identificarlos
+    "SegundosPausaBarrido": 60, // cada canal queda encendido este tiempo en el barrido
+    // Observado en el gabinete (2026-10-23): OUT -> ícono que enciende. El resto de canales no tiene ícono conectado.
+    "Indicadores": { "1": "Impresora", "2": "Monedas", "3": "Pasaporte", "4": "QR", "5": "Recicladora" },
+    "BarrerTodosLosCanales": false // true = recorre los 18 canales (18 min) para re-explorar
+  },
+  "Qr": {
+    // XZG004 (item 10 BEEX). "Teclado" = HID-KBW, como llega de fábrica (en la máquina aparece como HID Keyboard VID_26F1&PID_D101).
+    // Para disparar el lector bajo demanda pase a "Serial" (USB CDC / RS-232), ponga el COM en Puerto y el comando de disparo en
+    // hex en ComandoActivar: el manual solo documenta códigos de programación, el comando serial hay que pedirlo al fabricante.
+    "Modo": "Teclado",
+    "Puerto": "",
+    "BaudRate": 115200,
+    "ComandoActivar": "",
+    "ComandoDesactivar": "",
+    "TimeoutSegundos": 30,
+    "SilencioTramaMs": 100,
+    // Opción 32: candidatos supuestos (no vienen en el manual); el que encienda el haz va a ComandoActivar.
+    "ComandosCandidatos": [ "16 54 0D", "16 55 0D", "1B 31", "1B 30" ],
+    "SegundosPorComando": 5
   },
   "Camara": {
     // Item 12 del BEEX (GDZS-DC004-MG3021): webcam USB estándar, sin SDK propio.
-    "IndiceDispositivo": 0,
-    "CarpetaCapturas": "Capturas"
+    // La vista previa elige la cámara cuyo nombre DirectShow contiene este texto (en la laptop no existe: pregunta cuál usar).
+    "NombreDispositivo": "GDZS-010101-03M-V",
+    "IndiceDispositivo": 1, // GDZS-010101-03M-V (visible, a color) en DirectShow; 0 = GDZS-020202-02M-IR (grises)
+    "CarpetaCapturas": "C:\\Users\\1\\Pictures"
   }
 }
 ```

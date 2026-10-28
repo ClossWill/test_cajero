@@ -23,6 +23,7 @@ public sealed record LedRespuesta(bool Ok, byte Cmd, byte Para, byte[] Datos);
 public sealed class LedControlBus : IDisposable
 {
     public const byte CConsultarFirmware = 0x31;
+    public const byte CConsultarEntradas = 0x32; // estado de las 6 entradas de sensor de 5 V (hoja de protocolo, §consulta de entradas)
     public const byte CApagar = 0x33;
     public const byte CParpadear = 0x34;
     public const byte CEncender = 0x35;

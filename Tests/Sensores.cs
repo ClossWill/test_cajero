@@ -68,6 +68,54 @@ public static partial class HardwareTests
             !(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Q);
     }
 
+    // Hallazgo (2026-10-28): COM5 no entrega ni un byte en reposo. El BEEX llama "Multifunctional serial control module"
+    // al ALB02, y esa es la carpeta de la tarjeta de 18 canales (COM2): su hoja de protocolo documenta CMD 0x32, consulta
+    // de 6 entradas de sensor de 5 V. Esta prueba la sondea y muestra la respuesta cruda y qué byte/bit cambia; el formato
+    // exacto de RESP no se pudo leer del PDF, así que se descubre manipulando la puerta y golpeando el gabinete.
+    public static void Test_EscucharSensoresTarjeta()
+    {
+        var leds = HardwareConfig.Actual.Leds;
+        Consola.Titulo($"Sensores por tarjeta de 18 canales - Entradas (CMD 0x32) en {leds.Puerto} @ {leds.BaudRate}");
+        Consola.Info("Abra/cierre la puerta y golpee el gabinete. Se imprime solo cuando la respuesta cambia. Q para terminar.");
+
+        using var bus = new LedControlBus(leds.Puerto, leds.BaudRate);
+        // Confirmado en la máquina real (2026-10-28): PARA 0x00 devuelve 6 bytes (uno por entrada, 0/1); PARA 0x31 lo rechaza ('N' 05).
+        const byte para = 0x00;
+        byte[]? anterior = null;
+        var fallas = 0;
+
+        while (!(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Q))
+        {
+            var r = bus.Enviar(LedControlBus.CConsultarEntradas, para, 300);
+            if (r is null)
+            {
+                if (fallas++ % 25 == 0) Consola.Error($"Sin respuesta: {bus.UltimoError}");
+                Thread.Sleep(200);
+                continue;
+            }
+            fallas = 0;
+
+            if (!r.Ok)
+            {
+                Consola.Error($"La tarjeta rechazó CMD 0x32 con PARA 0x{para:X2} (respuesta 'N': {Consola.Hex(r.Datos)}).");
+                return;
+            }
+
+            if (anterior is null || !r.Datos.AsSpan().SequenceEqual(anterior))
+            {
+                var estado = string.Join(' ', r.Datos.Select((v, i) => $"E{i + 1}={v}"));
+                var detalle = "";
+                if (anterior is not null && anterior.Length == r.Datos.Length)
+                    detalle = "  << " + string.Join(", ", Enumerable.Range(0, r.Datos.Length)
+                        .Where(i => r.Datos[i] != anterior[i])
+                        .Select(i => $"ENTRADA {i + 1}: {anterior[i]}->{r.Datos[i]}"));
+                Consola.Ok($"[{DateTime.Now:HH:mm:ss.fff}] {estado}   (RESP: {Consola.Hex(r.Datos)}){detalle}");
+                anterior = r.Datos;
+            }
+            Thread.Sleep(150);
+        }
+    }
+
     // Captura qué tramas llegan en reposo y al provocar cada evento, para copiarlas a hardware.json.
     public static void Test_CalibrarSensores()
     {

@@ -50,6 +50,7 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
         ("7", "Calibrar tramas ALB02",    HardwareTests.Test_CalibrarSensores),
         ("8", "Escuchar (puerta/vibración)", HardwareTests.Test_EscucharSensores),
         ("16", "Ping (abre el puerto COM)", HardwareTests.Test_PingSensores),
+        ("33", "Escuchar entradas por la tarjeta de 18 canales (COM2, CMD 0x32; exploratorio)", HardwareTests.Test_EscucharSensoresTarjeta),
     }),
     ("Escáner", new (string Clave, string Texto, Action Accion)[]
     {

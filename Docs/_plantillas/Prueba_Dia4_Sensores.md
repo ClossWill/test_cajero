@@ -1,5 +1,7 @@
 # Prueba Día 4 – Módulo de sensores y seguridad ALB02
 
+> **Pendiente (2026-10-28):** en COM5 la calibración no recibe ningún byte; los sensores parecen estar en las 6 entradas de la tarjeta de 18 canales (COM2, CMD 0x32, menú 33). Ver [Pendientes.md](Pendientes.md) §2.
+
 ## Objetivo
 
 Leer el puerto COM del ALB02 en un bucle reactivo y mostrar `¡PUERTA ABIERTA!` o `¡VIBRACIÓN DETECTADA!` cuando se manipule físicamente el gabinete.

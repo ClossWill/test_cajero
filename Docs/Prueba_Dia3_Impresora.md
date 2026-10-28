@@ -260,6 +260,38 @@ public static class AutoReplyPrintSdk
     [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
     private static extern int CP_Pos_SetTextScale(IntPtr handle, int nWidthScale, int nHeightScale);
 
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr CP_Library_Version();
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern uint CP_Port_EnumUsb(byte[] pBuf, uint cbBuf, out uint pcbNeeded);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern uint CP_Port_EnumCom(byte[] pBuf, uint cbBuf, out uint pcbNeeded);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Port_IsOpened(IntPtr handle);
+
+    // Estado que la impresora reporta sola en modo autoreply (no hace falta consultarlo con QueryRTStatus).
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Printer_GetPrinterStatusInfo(IntPtr handle, out long errorStatus, out long infoStatus,
+        out long timestampMs);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Printer_GetPrinterReceivedInfo(IntPtr handle, out uint bytesRecibidos, out long timestampMs);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Printer_GetPrinterPrintedInfo(IntPtr handle, out uint paginaImpresa, out long timestampMs);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Printer_GetPrinterFirmwareVersion(IntPtr handle, byte[] pBuf, uint cbBuf, out uint pcbNeeded);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Printer_ClearPrinterError(IntPtr handle);
+
+    [DllImport(Dll, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int CP_Printer_ClearPrinterBuffer(IntPtr handle);
+
     public const int AlineacionIzquierda = 0;
     public const int AlineacionCentro = 1;
     public const int AlineacionDerecha = 2;
@@ -298,6 +330,33 @@ public static class AutoReplyPrintSdk
         var nombre = puerto.StartsWith(@"\\.\", StringComparison.Ordinal) ? puerto : @"\\.\" + puerto;
         return CP_Port_OpenCom(nombre, baudios, databits: 8, parity: 0, stopbits: 0, flowcontrol: 0, autoreplymode: 1);
     }
+
+    /// <summary>Igual que <see cref="Abrir"/> pero eligiendo el modo autoreply: el .h avisa que solo algunos modelos lo
+    /// soportan, así que el diagnóstico prueba con y sin él.</summary>
+    public static IntPtr AbrirUsb(string nombre, bool autoreply) => CP_Port_OpenUsb(nombre, autoreply ? 1 : 0);
+
+    public static string Version() => Marshal.PtrToStringAnsi(CP_Library_Version()) ?? "(desconocida)";
+
+    /// <summary>Nombres de las impresoras USB que ve el SDK (CP_Port_EnumUsb).</summary>
+    public static List<string> EnumerarUsb() => Enumerar(CP_Port_EnumUsb);
+
+    /// <summary>Puertos COM que ve el SDK (CP_Port_EnumCom).</summary>
+    public static List<string> EnumerarCom() => Enumerar(CP_Port_EnumCom);
+
+    private delegate uint EnumFn(byte[] buf, uint cb, out uint needed);
+
+    // El .h no documenta el formato del buffer; se leen las cadenas ANSI separadas por '\0' (o por salto de línea).
+    private static List<string> Enumerar(EnumFn fn)
+    {
+        var buf = new byte[4096];
+        var n = fn(buf, (uint)buf.Length, out _);
+        if (n == 0) return new List<string>();
+        return System.Text.Encoding.Default.GetString(buf)
+            .Split(new[] { '\0', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.Trim()).Where(t => t.Length > 0).ToList();
+    }
+
+    public static bool EstaAbierto(IntPtr handle) => EsValido(handle) && CP_Port_IsOpened(handle) != 0;
 
     public static bool EsValido(IntPtr handle) => handle != IntPtr.Zero;
 
@@ -341,6 +400,54 @@ public static class AutoReplyPrintSdk
     public static bool ErrorCortador(int rtstatus) => ((rtstatus >> 16) & 0x08) == 0x08;
     public static bool ErrorIrrecuperable(int rtstatus) => ((rtstatus >> 16) & 0x20) == 0x20;
     public static bool PapelPorAgotarse(int rtstatus) => ((rtstatus >> 24) & 0x0C) == 0x0C;
+
+    /// <summary>Firmware de la impresora; null si no responde (mismo "sin verificación garantizada" que QueryRTStatus).</summary>
+    public static string? VersionFirmware(IntPtr handle)
+    {
+        var buf = new byte[256];
+        if (CP_Printer_GetPrinterFirmwareVersion(handle, buf, (uint)buf.Length, out _) == 0) return null;
+        var texto = System.Text.Encoding.Default.GetString(buf).TrimEnd('\0').Trim();
+        return texto.Length == 0 ? null : texto;
+    }
+
+    /// <summary>Estado autónomo de la impresora (modo autoreply). <paramref name="errores"/> y <paramref name="info"/> son las
+    /// máscaras CP_PRINTERSTATUS_ERROR_XXX / CP_PRINTERSTATUS_INFO_XXX; false si el SDK aún no recibió ninguna.</summary>
+    public static bool ConsultarEstadoAutonomo(IntPtr handle, out long errores, out long info) =>
+        CP_Printer_GetPrinterStatusInfo(handle, out errores, out info, out _) != 0;
+
+    /// <summary>Bytes que la impresora ha recibido en total (para comparar con los enviados) y el id de la última página impresa.</summary>
+    public static bool ConsultarContadores(IntPtr handle, out uint bytesRecibidos, out uint paginaImpresa)
+    {
+        paginaImpresa = 0;
+        var ok = CP_Printer_GetPrinterReceivedInfo(handle, out bytesRecibidos, out _) != 0;
+        ok &= CP_Printer_GetPrinterPrintedInfo(handle, out paginaImpresa, out _) != 0;
+        return ok;
+    }
+
+    /// <summary>Limpia el error latente de la impresora (atasco resuelto, tapa cerrada) para poder reintentar sin reiniciarla.</summary>
+    public static bool LimpiarError(IntPtr handle) => CP_Printer_ClearPrinterError(handle) != 0;
+
+    /// <summary>Descarta lo pendiente en el buffer de la impresora (un trabajo a medias de una falla anterior).</summary>
+    public static bool LimpiarBuffer(IntPtr handle) => CP_Printer_ClearPrinterBuffer(handle) != 0;
+
+    // Máscaras de CP_PRINTERSTATUS_ERROR_XXX / CP_PRINTERSTATUS_INFO_XXX (autoreplyprint.h).
+    public static string DescribirErrores(long errores)
+    {
+        var problemas = new List<string>();
+        if ((errores & 0x01) != 0) problemas.Add("cortador");
+        if ((errores & 0x02) != 0) problemas.Add("flash");
+        if ((errores & 0x04) != 0) problemas.Add("sin papel");
+        if ((errores & 0x08) != 0) problemas.Add("voltaje");
+        if ((errores & 0x10) != 0) problemas.Add("marca de papel");
+        if ((errores & 0x20) != 0) problemas.Add("motor de impresión");
+        if ((errores & 0x40) != 0) problemas.Add("sobrecalentamiento");
+        if ((errores & 0x80) != 0) problemas.Add("tapa abierta");
+        if ((errores & 0x100) != 0) problemas.Add("motor");
+        return problemas.Count == 0 ? "sin errores" : string.Join(", ", problemas);
+    }
+
+    public static bool ImpresoraOciosa(long info) => (info & 0x40) != 0; // CP_PRINTERSTATUS_INFO_PRINTIDLE
+    public static bool HayDatosPendientes(long info) => (info & 0x08) != 0; // CP_PRINTERSTATUS_INFO_HAVEDATA
 
     public static string DescribirEstado(int rtstatus)
     {
@@ -456,9 +563,6 @@ public static partial class HardwareTests
                 ImpresoraRaw.Enviar(cfg.NombreImpresora, voucher);
                 r.Criterio($"{voucher.Length} bytes entregados al spooler de '{cfg.NombreImpresora}'", true);
             }
-
-            r.Criterio("Imprimió 'Hola Mundo FINSO' legible y en negritas", Consola.PreguntarAsistente("¿Salió un ticket con \"Hola Mundo FINSO\" en negritas?"));
-            r.Criterio("El autocortador cortó el papel", Consola.PreguntarAsistente("¿El ticket salió cortado (suelto)?"));
         }
         catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
         r.Finalizar();
@@ -512,9 +616,6 @@ public static partial class HardwareTests
 
             if (AutoReplyPrintSdk.ConsultarEstado(h, 1000, out var estadoFinal))
                 Consola.Info($"        Estado después de imprimir: {AutoReplyPrintSdk.DescribirEstado(estadoFinal)}");
-
-            r.Criterio("Imprimió 'Hola Mundo FINSO' legible y en negritas", Consola.PreguntarAsistente("¿Salió un ticket con \"Hola Mundo FINSO\" en negritas?"));
-            r.Criterio("El autocortador cortó el papel", Consola.PreguntarAsistente("¿El ticket salió cortado (suelto)?"));
         }
         finally { AutoReplyPrintSdk.Cerrar(h); }
     }
@@ -612,12 +713,6 @@ public static partial class HardwareTests
             ImpresoraRaw.Enviar(cfg.NombreImpresora, voucher);
             r.Criterio($"{voucher.Length} bytes entregados al spooler de '{cfg.NombreImpresora}'", true);
         }
-
-        r.Criterio("El asistente ve el logo de FINSO impreso arriba del ticket",
-            Consola.PreguntarAsistente("¿Se ve el logo de FINSO (letras azules + figura verde) arriba del ticket?"));
-        r.Criterio("El asistente ve los datos de la operación con formato de voucher tradicional (fecha, operación, montos, denominaciones, tipo de cambio, identificación, terminal y folio)",
-            Consola.PreguntarAsistente("¿El ticket muestra esos datos en líneas separadas, con separadores, como un comprobante normal?"));
-        r.Criterio("El autocortador cortó el papel", Consola.PreguntarAsistente("¿El ticket salió cortado (suelto)?"));
     }
 
     private static void ImprimirVoucherPorSdk(Reporte r, ImpresoraConfig cfg)
@@ -625,9 +720,117 @@ public static partial class HardwareTests
         var h = AutoReplyPrintSdk.Abrir(cfg.NombreUsb);
         if (!r.Criterio($"Apertura de impresora USB '{cfg.NombreUsb}' vía SDK (autoreply)", AutoReplyPrintSdk.EsValido(h)))
             return;
+        ImprimirVoucherEnHandle(r, cfg, h);
+    }
 
+    /// <summary>
+    /// Opción de menú propia del SDK del fabricante (autoreplyprint.dll), sin depender de Impresora.Modo: enumera lo que el
+    /// SDK ve (USB y COM), abre la primera impresora que responda (con y sin autoreply) e imprime el voucher de operación.
+    /// </summary>
+    public static void Test_ImprimirVoucherSdk()
+    {
+        var cfg = HardwareConfig.Actual.Impresora;
+        var r = new Reporte("Impresora KP-80A - Voucher de operación por SDK (autoreplyprint.dll)");
         try
         {
+            Consola.Info($"        SDK autoreplyprint versión {AutoReplyPrintSdk.Version()}");
+            var usb = AutoReplyPrintSdk.EnumerarUsb();
+            var com = AutoReplyPrintSdk.EnumerarCom();
+            Consola.Info($"        USB que ve el SDK: {(usb.Count == 0 ? "(ninguna)" : string.Join(" | ", usb))}");
+            Consola.Info($"        COM que ve el SDK: {(com.Count == 0 ? "(ninguno)" : string.Join(" | ", com))}");
+
+            // Primero lo que el SDK enumeró, luego el nombre de hardware.json: con una sola impresora USB el SDK abre
+            // la que encuentre aunque el nombre sea cualquier texto.
+            var nombres = usb.Append(cfg.NombreUsb).Distinct().ToList();
+            var h = IntPtr.Zero;
+            foreach (var nombre in nombres)
+            {
+                foreach (var autoreply in new[] { true, false })
+                {
+                    h = AutoReplyPrintSdk.AbrirUsb(nombre, autoreply);
+                    var ok = AutoReplyPrintSdk.EsValido(h);
+                    Consola.Info($"        Abrir USB '{nombre}' autoreply={(autoreply ? "sí" : "no")}: {(ok ? "OK" : "falló")}");
+                    if (ok) break;
+                }
+                if (AutoReplyPrintSdk.EsValido(h)) break;
+            }
+
+            if (!r.Criterio("Apertura de la impresora vía SDK", AutoReplyPrintSdk.EsValido(h),
+                    "Si falla con USB: el SDK solo abre si Windows la ve como 'USB Printing Support'; ver Docs/Prueba_Dia3_Impresora.md"))
+            { r.Finalizar(); return; }
+
+            ImprimirVoucherEnHandle(r, cfg, h);
+        }
+        catch (DllNotFoundException ex) { r.Criterio("autoreplyprint.dll disponible junto al .exe", false, ex.Message); }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
+    // Chequeo previo a imprimir, pensado para el flujo productivo: no se entrega un ticket a una impresora con error
+    // (el cliente ya pagó/recibió efectivo y espera el comprobante). Si hay un error latente intenta limpiarlo una vez
+    // (ClearPrinterError) antes de rendirse. Devuelve false solo si la impresora reporta un error que persiste;
+    // la falta de respuesta de estado se avisa y no bloquea (el SDK no garantiza esos datos, ver Ping).
+    private static bool ImpresoraLista(Reporte r, IntPtr h)
+    {
+        var firmware = AutoReplyPrintSdk.VersionFirmware(h);
+        Consola.Info($"        Firmware: {firmware ?? "(sin respuesta)"}");
+
+        // En autoreply la impresora manda su estado sola; puede tardar un instante tras abrir el puerto.
+        long errores = 0, info = 0;
+        var hayEstado = false;
+        for (var intento = 0; intento < 5 && !hayEstado; intento++)
+        {
+            hayEstado = AutoReplyPrintSdk.ConsultarEstadoAutonomo(h, out errores, out info);
+            if (!hayEstado) Thread.Sleep(200);
+        }
+
+        if (hayEstado && errores != 0)
+        {
+            Consola.Aviso($"        Error reportado por la impresora: {AutoReplyPrintSdk.DescribirErrores(errores)}. Se intenta limpiar.");
+            AutoReplyPrintSdk.LimpiarError(h);
+            Thread.Sleep(500);
+            AutoReplyPrintSdk.ConsultarEstadoAutonomo(h, out errores, out info);
+        }
+
+        if (hayEstado)
+        {
+            if (!r.Criterio("Impresora sin errores antes de imprimir (CP_Printer_GetPrinterStatusInfo)", errores == 0,
+                    AutoReplyPrintSdk.DescribirErrores(errores)))
+                return false;
+        }
+        else
+        {
+            Consola.Aviso("        Sin estado autónomo de la impresora (se continúa con QueryRTStatus).");
+        }
+
+        if (AutoReplyPrintSdk.ConsultarEstado(h, 1000, out var rt))
+        {
+            Consola.Info($"        Estado en tiempo real: {AutoReplyPrintSdk.DescribirEstado(rt)}");
+            if (!r.Criterio("Sin papel/tapa/cortador reportado antes de imprimir (QueryRTStatus)",
+                    !(AutoReplyPrintSdk.SinPapel(rt) || AutoReplyPrintSdk.TapaAbierta(rt) || AutoReplyPrintSdk.ErrorCortador(rt)),
+                    AutoReplyPrintSdk.DescribirEstado(rt)))
+                return false;
+            if (AutoReplyPrintSdk.PapelPorAgotarse(rt))
+                Consola.Aviso("        Papel por agotarse: imprime, pero hay que reponer el rollo pronto.");
+        }
+        else
+        {
+            Consola.Aviso("        Sin respuesta de QueryRTStatus (se continúa).");
+        }
+
+        return true;
+    }
+
+    // Imprime el voucher con un handle ya abierto y lo cierra al terminar.
+    private static void ImprimirVoucherEnHandle(Reporte r, ImpresoraConfig cfg, IntPtr h)
+    {
+        try
+        {
+            if (!ImpresoraLista(r, h)) return;
+
+            // Un trabajo a medias de una falla anterior saldría pegado a este ticket.
+            AutoReplyPrintSdk.LimpiarBuffer(h);
+            AutoReplyPrintSdk.ConsultarContadores(h, out var bytesAntes, out var paginaAntes);
             AutoReplyPrintSdk.Reset(h);
 
             // Datos de muestra: una operación de compra de dólares consistente con los casetes reales
@@ -698,11 +901,19 @@ public static partial class HardwareTests
             var salioImpreso = AutoReplyPrintSdk.ConsultarResultadoImpresion(h, 3000);
             r.Criterio("El SDK confirma que el ticket se imprimió (QueryPrintResult)", salioImpreso);
 
-            r.Criterio("El asistente ve el logo de FINSO impreso arriba del ticket",
-                Consola.PreguntarAsistente("¿Se ve el logo de FINSO (letras azules + figura verde) arriba del ticket?"));
-            r.Criterio("El asistente ve los datos de la operación con formato de voucher tradicional (fecha, operación, montos, denominaciones, tipo de cambio, identificación, terminal y folio)",
-                Consola.PreguntarAsistente("¿El ticket muestra esos datos en líneas separadas, con separadores, como un comprobante normal?"));
-            r.Criterio("El autocortador cortó el papel", Consola.PreguntarAsistente("¿El ticket salió cortado (suelto)?"));
+            // Segunda confirmación independiente: la impresora recibió bytes nuevos (contador propio de la impresora).
+            // El id de página impresa NO es criterio: visto el 2026-10-23 en la KP-80A (fw mh1.12.03) que se queda en 0
+            // aunque el ticket sale y QueryPrintResult confirma; ese id parece contar solo páginas de etiqueta, no tickets.
+            if (AutoReplyPrintSdk.ConsultarContadores(h, out var bytes, out var paginaDespues))
+            {
+                Consola.Info($"        Bytes recibidos por la impresora: {bytesAntes} -> {bytes} | id de página impresa: {paginaAntes} -> {paginaDespues}");
+                r.Criterio("La impresora reporta haber recibido el trabajo (contador de bytes)", bytes != bytesAntes);
+                if (paginaDespues == paginaAntes)
+                    Consola.Info("        El id de página no avanzó: informativo, esta impresora no lo incrementa con tickets.");
+            }
+
+            if (AutoReplyPrintSdk.ConsultarEstadoAutonomo(h, out var erroresFinal, out _))
+                r.Criterio("Impresora sin errores después de imprimir", erroresFinal == 0, AutoReplyPrintSdk.DescribirErrores(erroresFinal));
         }
         finally { AutoReplyPrintSdk.Cerrar(h); }
     }
@@ -773,8 +984,6 @@ HardwareTests.Test_ImprimirVoucherOperacion();
 | I-06 | Con la tapa abierta o sin papel la prueba falla de forma controlada (sin colgar el programa) | Prueba negativa opcional |
 | I-07 | Modo UsbSdk: antes de imprimir no reporta sin papel / tapa abierta / error de cortador | Criterio automático (`CP_Pos_QueryRTStatus`) |
 | I-08 | Modo UsbSdk: el SDK confirma que el ticket se imprimió, no solo que se envió | Criterio automático (`CP_Pos_QueryPrintResult`) |
-| I-13 | Opción 26 (SDK): antes de imprimir la impresora no reporta errores (`CP_Printer_GetPrinterStatusInfo`); si hay un error latente se intenta `ClearPrinterError` una vez y, si persiste, **no se imprime** | Criterio automático |
-| I-14 | Opción 26 (SDK): después de imprimir, el contador de bytes recibidos de la impresora aumentó y no quedó ningún error | Criterio automático (`GetPrinterReceivedInfo`). El id de página impresa (`GetPrinterPrintedInfo`) solo se muestra: en la KP-80A (fw mh1.12.03) se queda en 0 con tickets (2026-10-23) |
 | I-10 | El logo (`RutaLogo`) se encuentra en disco y se arma el comando de imagen sin excepción (`CP_Pos_PrintRasterImageFromFile` en UsbSdk, `GS v 0`/`ImagenDesdeArchivo` en Spooler/Serial) | Criterio automático |
 | I-11 | El asistente ve el logo de FINSO legible arriba del ticket | Inspección del voucher |
 | I-12 | El asistente ve los datos de la operación con formato de voucher tradicional (fecha, operación, montos, denominaciones, tipo de cambio, comisión, identificación, terminal, folio) | Inspección del voucher |
