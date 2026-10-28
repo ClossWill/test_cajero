@@ -83,6 +83,21 @@
     "Indicadores": { "1": "Impresora", "2": "Monedas", "3": "Pasaporte", "4": "QR", "5": "Recicladora" },
     "BarrerTodosLosCanales": false // true = recorre los 18 canales (18 min) para re-explorar
   },
+  "Qr": {
+    // XZG004 (item 10 BEEX). "Teclado" = HID-KBW, como llega de fábrica (en la máquina aparece como HID Keyboard VID_26F1&PID_D101).
+    // Para disparar el lector bajo demanda pase a "Serial" (USB CDC / RS-232), ponga el COM en Puerto y el comando de disparo en
+    // hex en ComandoActivar: el manual solo documenta códigos de programación, el comando serial hay que pedirlo al fabricante.
+    "Modo": "Teclado",
+    "Puerto": "",
+    "BaudRate": 115200,
+    "ComandoActivar": "",
+    "ComandoDesactivar": "",
+    "TimeoutSegundos": 30,
+    "SilencioTramaMs": 100,
+    // Opción 32: candidatos supuestos (no vienen en el manual); el que encienda el haz va a ComandoActivar.
+    "ComandosCandidatos": [ "16 54 0D", "16 55 0D", "1B 31", "1B 30" ],
+    "SegundosPorComando": 5
+  },
   "Camara": {
     // Item 12 del BEEX (GDZS-DC004-MG3021): webcam USB estándar, sin SDK propio.
     // La vista previa elige la cámara cuyo nombre DirectShow contiene este texto (en la laptop no existe: pregunta cuál usar).

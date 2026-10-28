@@ -56,6 +56,12 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
         ("9", "Leer documento",           HardwareTests.Test_EscanearDocumento),
         ("17", "Ping (inicializa SDK, sin leer)", HardwareTests.Test_PingEscaner),
     }),
+    ("Lector QR", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("30", "Leer código QR (activa el lector solo durante la prueba)", HardwareTests.Test_LeerQr),
+        ("31", "Ping (abre el puerto; solo Qr.Modo = Serial)", HardwareTests.Test_PingQr),
+        ("32", "Probar comandos de disparo (candidatos de hardware.json; solo Qr.Modo = Serial)", HardwareTests.Test_ProbarComandosQr),
+    }),
     ("LEDs", new (string Clave, string Texto, Action Accion)[]
     {
         ("12", "Control de indicadores (18 canales)", HardwareTests.Test_ControlarLeds),

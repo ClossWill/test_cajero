@@ -12,6 +12,7 @@ public sealed class HardwareConfig
     public SensoresConfig Sensores { get; set; } = new();
     public LedsConfig Leds { get; set; } = new();
     public CamaraConfig Camara { get; set; } = new();
+    public QrConfig Qr { get; set; } = new();
 
     public static string RutaArchivo => Path.Combine(AppContext.BaseDirectory, "hardware.json");
 
@@ -159,4 +160,31 @@ public sealed class CamaraConfig
     public string NombreDispositivo { get; set; } = "GDZS-010101-03M-V";
     public int IndiceDispositivo { get; set; } = 1;
     public string CarpetaCapturas { get; set; } = @"C:\Users\1\Pictures";
+}
+
+// Item 10 del BEEX (XZG004, manual "XZG004 EN Barcode User Manual V1.0"): lector 1D/2D. De fábrica en modo "Manual"
+// (Command + Button Trig): solo decodifica cuando recibe el disparo, no escanea solo. El manual documenta los códigos de
+// programación, pero NO el comando serial de disparo; por eso el comando es configurable y debe confirmarse con el fabricante.
+public sealed class QrConfig
+{
+    // "Teclado" = HID-KBW (como llega de fábrica según el BEEX): el lector "teclea" el contenido en la consola; no hay
+    //             canal de comandos, así que la prueba solo abre una ventana de captura y descarta lo tecleado antes.
+    // "Serial"  = USB CDC o RS-232: la prueba envía ComandoActivar, espera el dato y envía ComandoDesactivar.
+    public string Modo { get; set; } = "Teclado";
+    public string Puerto { get; set; } = "";               // solo Modo=Serial; el COM nuevo que aparece al pasar el lector a USB CDC
+    public int BaudRate { get; set; } = 115200;            // default de fábrica del manual (RS-232 / CDC)
+    public string ComandoActivar { get; set; } = "";       // hex, ej. "1B 31". Vacío = no se envía nada (el lector decide cuándo escanear)
+    public string ComandoDesactivar { get; set; } = "";    // hex; se envía al terminar o al vencer el tiempo
+    public int TimeoutSegundos { get; set; } = 30;
+    public int SilencioTramaMs { get; set; } = 100;        // silencio que cierra el dato (el lector puede no mandar terminador)
+    // Test_ProbarComandosQr: comandos de disparo habituales en lectores 1D/2D, SUPUESTOS (no vienen en el manual). Cuando
+    // uno encienda el haz del lector, copiarlo a ComandoActivar (y su pareja de apagado a ComandoDesactivar).
+    public List<string> ComandosCandidatos { get; set; } = new()
+    {
+        "16 54 0D",  // SYN T CR: activar disparo (estilo Honeywell/Metrologic)
+        "16 55 0D",  // SYN U CR: desactivar
+        "1B 31",     // ESC 1
+        "1B 30",     // ESC 0
+    };
+    public int SegundosPorComando { get; set; } = 5;       // pausa tras cada candidato para ver si el lector reaccionó
 }
