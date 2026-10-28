@@ -65,6 +65,7 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
     {
         ("13", "Capturar foto (item 12 BEEX)",         HardwareTests.Test_CapturarRostro),
         ("28", "Capturar frame de video (graba 3 s y guarda un frame)", HardwareTests.Test_CapturarFrameVideo),
+        ("29", "Vista previa en vivo (ventana; ESC/Q cierra, S guarda foto)", HardwareTests.Test_VistaPreviaCamara),
         ("19", "Ping (abre el dispositivo)", HardwareTests.Test_PingCamara),
     }),
 };

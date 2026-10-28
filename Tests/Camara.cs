@@ -1,5 +1,6 @@
 using IntegracionCajeroPruebas.Config;
 using IntegracionCajeroPruebas.Helpers;
+using IntegracionCajeroPruebas.Protocolos;
 using OpenCvSharp;
 
 namespace IntegracionCajeroPruebas.Tests;
@@ -128,6 +129,119 @@ public static partial class HardwareTests
         }
         catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
         r.Finalizar();
+    }
+
+    /// <summary>
+    /// Abre una ventana con el video en vivo de la cámara. La cámara se identifica por nombre DirectShow
+    /// (CamaraConfig.NombreDispositivo): en el ATM resuelve sola a la GDZS-010101-03M-V; en la laptop, donde ese
+    /// nombre no existe, lista las cámaras disponibles y pregunta cuál usar.
+    /// </summary>
+    public static void Test_VistaPreviaCamara()
+    {
+        const string ventana = "Vista previa - Camara FINSO";
+        var cfg = HardwareConfig.Actual.Camara;
+        var r = new Reporte("Cámara USB - Vista previa en vivo");
+        try
+        {
+            var indice = ResolverIndiceCamara(cfg, out var nombre);
+            if (!r.Criterio("Se identificó el dispositivo de cámara", indice >= 0)) { r.Finalizar(); return; }
+
+            using var captura = AbrirCamara(indice);
+            if (!r.Criterio($"La cámara \"{nombre}\" (índice {indice}) se abre", captura.IsOpened())) { r.Finalizar(); return; }
+
+            Consola.Aviso("  >> Ventana abierta. ESC o Q (o cerrar la ventana) termina; S guarda una foto.");
+            using var frame = new Mat();
+            using var vista = new Mat();
+            var mostrada = false;
+            var cuadros = 0;
+            var fotos = 0;
+            var fps = 0.0;
+            var cuadrosEnSegundo = 0;
+            var reloj = System.Diagnostics.Stopwatch.StartNew();
+            var ultimoCalculo = TimeSpan.Zero;
+            var ultimoFrame = TimeSpan.Zero;
+            try
+            {
+                while (true)
+                {
+                    if (captura.Read(frame) && !frame.Empty())
+                    {
+                        cuadros++;
+                        cuadrosEnSegundo++;
+                        ultimoFrame = reloj.Elapsed;
+                        if (reloj.Elapsed - ultimoCalculo >= TimeSpan.FromSeconds(1))
+                        {
+                            fps = cuadrosEnSegundo / (reloj.Elapsed - ultimoCalculo).TotalSeconds;
+                            cuadrosEnSegundo = 0;
+                            ultimoCalculo = reloj.Elapsed;
+                        }
+                        frame.CopyTo(vista);
+                        // Hershey solo dibuja ASCII: sin acentos en el rótulo.
+                        Cv2.PutText(vista, $"{nombre} | idx {indice} | {frame.Width}x{frame.Height} | {fps:F0} fps",
+                            new Point(10, 24), HersheyFonts.HersheySimplex, 0.6, Scalar.Black, 4);
+                        Cv2.PutText(vista, $"{nombre} | idx {indice} | {frame.Width}x{frame.Height} | {fps:F0} fps",
+                            new Point(10, 24), HersheyFonts.HersheySimplex, 0.6, Scalar.White, 1);
+                        Cv2.ImShow(ventana, vista);
+                        mostrada = true;
+                    }
+                    else if (reloj.Elapsed - ultimoFrame > TimeSpan.FromSeconds(10))
+                    {
+                        r.Criterio("La cámara sigue entregando frames", false, "sin frames durante 10 s");
+                        break;
+                    }
+
+                    var tecla = Cv2.WaitKey(1);
+                    if (tecla is 27 or 'q' or 'Q') break;
+                    if (tecla is 's' or 'S' && !frame.Empty())
+                    {
+                        Directory.CreateDirectory(cfg.CarpetaCapturas);
+                        var ruta = Path.GetFullPath(Path.Combine(cfg.CarpetaCapturas, $"vista_{DateTime.Now:yyyyMMdd_HHmmss}.jpg"));
+                        Cv2.ImWrite(ruta, frame);
+                        fotos++;
+                        Console.WriteLine($"  Foto guardada: {ruta}");
+                    }
+                    // Cerrar con la X de la ventana: la propiedad Visible baja a 0 (solo válida tras el primer ImShow).
+                    if (mostrada && Cv2.GetWindowProperty(ventana, WindowPropertyFlags.Visible) < 1) break;
+                }
+            }
+            finally { Cv2.DestroyAllWindows(); }
+
+            r.Criterio($"Se mostró video en vivo ({cuadros} cuadros en {reloj.Elapsed.TotalSeconds:F0} s, {fotos} foto(s) guardada(s))", cuadros > 0);
+        }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        r.Finalizar();
+    }
+
+    /// <summary>
+    /// Índice DSHOW de la cámara cuyo nombre contiene NombreDispositivo. Si no hay coincidencia (p. ej. en la
+    /// laptop de desarrollo) lista las cámaras y deja elegir. Devuelve -1 si no hay ninguna cámara.
+    /// </summary>
+    private static int ResolverIndiceCamara(CamaraConfig cfg, out string nombre)
+    {
+        nombre = "";
+        var camaras = DirectShowCamaras.Listar();
+        if (camaras.Count == 0) { Consola.Error("  DirectShow no reporta ninguna cámara."); return -1; }
+
+        Console.WriteLine("  Cámaras detectadas (índice DirectShow):");
+        for (var i = 0; i < camaras.Count; i++) Console.WriteLine($"    {i}: {camaras[i]}");
+
+        if (!string.IsNullOrWhiteSpace(cfg.NombreDispositivo))
+        {
+            var coincidencia = camaras.FindIndex(c => c.Contains(cfg.NombreDispositivo, StringComparison.OrdinalIgnoreCase));
+            if (coincidencia >= 0)
+            {
+                nombre = camaras[coincidencia];
+                Consola.Ok($"  Cámara \"{nombre}\" encontrada por nombre (índice {coincidencia}).");
+                return coincidencia;
+            }
+            Consola.Aviso($"  No hay una cámara con \"{cfg.NombreDispositivo}\" (¿entorno local?).");
+        }
+
+        Console.Write($"  Índice de cámara a usar [0]: ");
+        var elegido = int.TryParse(Console.ReadLine(), out var n) ? n : 0;
+        if (elegido < 0 || elegido >= camaras.Count) { Consola.Error($"  Índice {elegido} fuera de rango."); return -1; }
+        nombre = camaras[elegido];
+        return elegido;
     }
 
     /// <summary>Devuelve el índice de la primera cámara que entrega un frame a color (dejado en <paramref name="frame"/>), o -1.</summary>
