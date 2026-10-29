@@ -75,6 +75,11 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
         ("29", "Vista previa en vivo (ventana; ESC/Q cierra, S guarda foto)", HardwareTests.Test_VistaPreviaCamara),
         ("19", "Ping (abre el dispositivo)", HardwareTests.Test_PingCamara),
     }),
+    ("Pantalla periférica", new (string Clave, string Texto, Action Accion)[]
+    {
+        ("34", "Patrón de prueba a pantalla completa en el monitor secundario (ESC/Q cierra; toques marcan)", HardwareTests.Test_PantallaPeriferica),
+        ("35", "Ping (lista los monitores que ve Windows)", HardwareTests.Test_PingPantallas),
+    }),
 };
 
 while (true)
