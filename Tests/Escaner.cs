@@ -6,7 +6,33 @@ namespace IntegracionCajeroPruebas.Tests;
 
 public sealed record DocumentoLeido(string Nombre, string NumeroDocumento, string Nacionalidad,
     string FechaNacimiento, string FechaVencimiento, bool ChecksumValido, string? Mrz,
-    string? ImagenColor = null, string? ImagenIR = null, string? ImagenUV = null);
+    string? ImagenColor = null, string? ImagenIR = null, string? ImagenUV = null, int TipoSdk = 0)
+{
+    /// <summary>Pasaporte / INE / otra tarjeta, deducido de la MRZ (ICAO 9303), no del SDK.</summary>
+    public string TipoDocumento => ClasificarPorMrz(Mrz);
+
+    // Formato por número y largo de líneas: TD3 = 2x44 (pasaporte), TD2 = 2x36, TD1 = 3x30 (tarjeta, como el reverso de la INE).
+    // La primera letra da el tipo (P pasaporte, V visa, I/A/C tarjeta de identificación); una MRZ "IDMEX" es la INE mexicana.
+    public static string ClasificarPorMrz(string? mrz)
+    {
+        var lineas = (mrz ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (lineas.Length == 0) return "No identificado (sin MRZ: ¿se escaneó el frente de la INE?)";
+
+        var tipo = lineas[0][0];
+        if (lineas.Length == 3)
+            return lineas[0].StartsWith("IDMEX") ? "INE (credencial para votar, tarjeta TD1)"
+                 : tipo is 'I' or 'A' or 'C' ? "Tarjeta de identificación (TD1)" : "Documento TD1 no reconocido";
+        if (lineas.Length == 2)
+            return tipo switch
+            {
+                'P' => "Pasaporte",
+                'V' => "Visa",
+                'I' or 'A' or 'C' => "Tarjeta de identificación (TD2)",
+                _ => "Documento de 2 líneas no reconocido",
+            };
+        return $"MRZ de {lineas.Length} líneas no reconocida";
+    }
+}
 
 /// <summary>Frontera con el SDK propietario del MEPR500+. Solo lo que la prueba necesita.</summary>
 public interface IEscanerSdk : IDisposable
@@ -61,7 +87,7 @@ public sealed class EscanerMeprSdk : IEscanerSdk
         return new DocumentoLeido(nombre, _ultimo.PassportNo, _ultimo.Nationality,
             _ultimo.BirthDate, _ultimo.ExpiryDate, _ultimo.bCheckSum, mrz.Length == 0 ? null : mrz,
             ResolverRuta(_ultimoDatos.ColorFileName), ResolverRuta(_ultimoDatos.IRFileName),
-            ResolverRuta(_ultimoDatos.UVFileName));
+            ResolverRuta(_ultimoDatos.UVFileName), _ultimoDatos.iType);
     }
 
     // El SDK deja las imágenes en disco y solo entrega su ruta (como hace el demo IDRead/Form1.cs, que las abre
@@ -155,6 +181,7 @@ public static partial class HardwareTests
                 if (!r.Criterio($"Documento detectado en {cfg.TimeoutSegundos} s", presente)) { r.Finalizar(); return; }
 
                 var doc = escaner.Leer();
+                Console.WriteLine($"  Tipo de documento   : {doc.TipoDocumento} (iType del SDK: {doc.TipoSdk})");
                 Console.WriteLine($"  Nombre              : {doc.Nombre}");
                 Console.WriteLine($"  ID                  : {doc.NumeroDocumento}");
                 Console.WriteLine($"  Nacionalidad        : {doc.Nacionalidad}");
@@ -162,6 +189,7 @@ public static partial class HardwareTests
                 Console.WriteLine($"  Fecha de vencimiento: {doc.FechaVencimiento}");
                 if (doc.Mrz is not null) Console.WriteLine($"  MRZ                 : {doc.Mrz}");
 
+                r.Criterio("Tipo de documento identificado (pasaporte / INE / tarjeta)", doc.Mrz is not null);
                 r.Criterio("Nombre, ID y Nacionalidad extraídos (no vacíos)",
                     new[] { doc.Nombre, doc.NumeroDocumento, doc.Nacionalidad }.All(c => !string.IsNullOrWhiteSpace(c)));
                 // bCheckSum es el propio SDK validando el dígito verificador de la zona MRZ (ICAO 9303): a
