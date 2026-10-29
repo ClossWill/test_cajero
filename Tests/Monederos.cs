@@ -36,6 +36,49 @@ public static partial class HardwareTests
         r.Finalizar();
     }
 
+    /// <summary>
+    /// Solo lectura (no hace Reset ni Enable, el motor no gira): nivel por sensores (217), contador de monedas
+    /// pagadas de por vida (168), valor de moneda configurado (169) y flags de Test Hopper (163). El MK4 no
+    /// reporta cuántas monedas contiene; el nivel es solo "casi vacío / suficiente / lleno".
+    /// </summary>
+    public static void Test_NivelMonederos()
+    {
+        var r = new Reporte("Monederos MK4 - Nivel de monedas (solo lectura)");
+        var buses = new Dictionary<string, CcTalkBus>();
+        try
+        {
+            foreach (var h in Monederos.Hoppers)
+            {
+                var bus = ObtenerBus(r, buses, h);
+                if (bus is null) continue;
+                if (!r.Criterio($"{h.Nombre} responde a Simple Poll (dir {h.Direccion}, {h.Puerto})",
+                        bus.SimplePoll(h.Direccion), bus.UltimoError)) continue;
+
+                var nivel = bus.Enviar(h.Direccion, CcTalkBus.HRequestHighLowStatus);
+                if (r.Criterio($"{h.Nombre}: sensor de nivel (header 217) responde",
+                        nivel is { EsNak: false, Datos.Length: 1 },
+                        nivel is null ? bus.UltimoError : $"header respuesta={nivel.Header} datos={Consola.Hex(nivel.Datos)}"))
+                    Consola.Info($"        Nivel de monedas: {nivel!.Datos[0] switch { 0x30 => "suficiente", 0x31 => "casi vacío", 0x32 => "lleno", var x => $"desconocido ({x:X2})" }}");
+
+                // Informativos: no son criterio de aprobación, porque el estándar los marca opcionales.
+                var cuenta = bus.Enviar(h.Direccion, CcTalkBus.HRequestHopperDispenseCount);
+                if (cuenta is { EsNak: false, Datos.Length: 3 })
+                    Consola.Info($"        Monedas pagadas de por vida (header 168): {cuenta.Datos[0] | cuenta.Datos[1] << 8 | cuenta.Datos[2] << 16}");
+                else
+                    Consola.Aviso($"        Contador de monedas pagadas (header 168): no disponible ({(cuenta is null ? bus.UltimoError : $"datos={Consola.Hex(cuenta.Datos)}")})");
+
+                var valor = bus.Enviar(h.Direccion, CcTalkBus.HRequestHopperCoinValue);
+                Consola.Info($"        Valor de moneda (header 169): {(valor is { EsNak: false } ? $"{System.Text.Encoding.ASCII.GetString(valor.Datos.Where(b => b is >= 0x20 and < 0x7F).ToArray())} [{Consola.Hex(valor.Datos)}]" : "no disponible")}");
+
+                var test = bus.Enviar(h.Direccion, CcTalkBus.HTestHopper);
+                if (test is { EsNak: false }) Consola.Info($"        Flags de Test Hopper (header 163): {Consola.Hex(test.Datos)}");
+            }
+        }
+        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
+        finally { foreach (var b in buses.Values) b.Dispose(); }
+        r.Finalizar();
+    }
+
     public static void Test_DispensarMonedas(int cantidad_1_MXN, int cantidad_5_MXN)
     {
         var r = new Reporte($"Monederos MK4 - Dispensar {cantidad_1_MXN} x $1 y {cantidad_5_MXN} x $5");

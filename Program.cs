@@ -35,6 +35,7 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
     ("Monederos", new (string Clave, string Texto, Action Accion)[]
     {
         ("4", "Ping ccTalk",              HardwareTests.Test_PingMonederos),
+        ("36", "Nivel de monedas (sensores + contador de pagadas, solo lectura)", HardwareTests.Test_NivelMonederos),
         ("5", "Dispensar monedas",        () => HardwareTests.Test_DispensarMonedas(
                                                PedirEntero("Monedas de $1", 2), PedirEntero("Monedas de $5", 1))),
     }),
