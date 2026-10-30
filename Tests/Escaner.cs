@@ -6,7 +6,7 @@ namespace IntegracionCajeroPruebas.Tests;
 
 public sealed record DocumentoLeido(string Nombre, string NumeroDocumento, string Nacionalidad,
     string FechaNacimiento, string FechaVencimiento, bool ChecksumValido, string? Mrz,
-    string? ImagenColor = null, string? ImagenIR = null, string? ImagenUV = null);
+    string? ImagenColor = null, string? ImagenIR = null, string? ImagenUV = null, int TipoSdk = 0);
 
 /// <summary>Frontera con el SDK propietario del MEPR500+. Solo lo que la prueba necesita.</summary>
 public interface IEscanerSdk : IDisposable
@@ -61,7 +61,7 @@ public sealed class EscanerMeprSdk : IEscanerSdk
         return new DocumentoLeido(nombre, _ultimo.PassportNo, _ultimo.Nationality,
             _ultimo.BirthDate, _ultimo.ExpiryDate, _ultimo.bCheckSum, mrz.Length == 0 ? null : mrz,
             ResolverRuta(_ultimoDatos.ColorFileName), ResolverRuta(_ultimoDatos.IRFileName),
-            ResolverRuta(_ultimoDatos.UVFileName));
+            ResolverRuta(_ultimoDatos.UVFileName), _ultimoDatos.iType);
     }
 
     // El SDK deja las imágenes en disco y solo entrega su ruta (como hace el demo IDRead/Form1.cs, que las abre
@@ -155,6 +155,7 @@ public static partial class HardwareTests
                 if (!r.Criterio($"Documento detectado en {cfg.TimeoutSegundos} s", presente)) { r.Finalizar(); return; }
 
                 var doc = escaner.Leer();
+                Console.WriteLine($"  Tipo de documento   : {Mrz.TipoDocumento(doc.Mrz)} (iType del SDK = {doc.TipoSdk})");
                 Console.WriteLine($"  Nombre              : {doc.Nombre}");
                 Console.WriteLine($"  ID                  : {doc.NumeroDocumento}");
                 Console.WriteLine($"  Nacionalidad        : {doc.Nacionalidad}");
@@ -164,11 +165,13 @@ public static partial class HardwareTests
 
                 r.Criterio("Nombre, ID y Nacionalidad extraídos (no vacíos)",
                     new[] { doc.Nombre, doc.NumeroDocumento, doc.Nacionalidad }.All(c => !string.IsNullOrWhiteSpace(c)));
-                // bCheckSum es el propio SDK validando el dígito verificador de la zona MRZ (ICAO 9303): a
-                // diferencia del criterio anterior (que solo mira si los campos vinieron no vacíos), este es el
-                // único criterio automático que garantiza que lo leído corresponde de verdad al documento, sin
-                // depender de que el asistente lo compare a ojo.
-                r.Criterio("Dígito verificador de la MRZ válido (bCheckSum del SDK)", doc.ChecksumValido);
+                // Dígitos verificadores de la MRZ (ICAO 9303): a diferencia del criterio anterior (que solo mira si
+                // los campos vinieron no vacíos), este es el único criterio automático que garantiza que lo leído
+                // corresponde de verdad al documento, sin depender de que el asistente lo compare a ojo. Se
+                // calculan aquí y no con bCheckSum del SDK, que da falsos negativos (ver Helpers/Mrz.cs).
+                var mrz = Mrz.Validar(doc.Mrz);
+                Console.WriteLine($"  bCheckSum del SDK   : {(doc.ChecksumValido ? "válido" : "inválido")} (solo informativo)");
+                r.Criterio($"Dígitos verificadores de la MRZ válidos ({mrz.Formato})", mrz.Valido, mrz.Detalle);
 
                 GuardarImagen(r, "color", doc.ImagenColor, cfg.CarpetaCapturas, obligatoria: true);
                 GuardarImagen(r, "infrarroja", doc.ImagenIR, cfg.CarpetaCapturas, obligatoria: false);
