@@ -22,16 +22,23 @@
 4. Si ninguno funciona: pedir al fabricante del XZG004 el comando serial de disparo.
 5. Validar con el menú 30 que el lector solo escanea durante la prueba y queda inactivo al terminar.
 
-## 2. Sensores de puerta y vibración — identificar entradas
+## 2. Sensores de presencia y vibración — validar el menú 8
 
-**Hallazgo:** COM5 (el puerto configurado para el ALB02) no entrega ningún byte en reposo. El BEEX llama "Multifunctional serial control module (ALB02)" a la tarjeta de 18 canales de la carpeta de referencia, la misma de los LEDs en COM2 @ 19200. Esa tarjeta tiene 6 entradas de sensor de 5 V que se consultan con CMD 0x32.
+**Alcance:** solo existen dos sensores (confirmado por el equipo, 2026-10-29): presencia frente a la puerta y vibración. No hay contacto de puerta abierta, así que `¡PUERTA ABIERTA!` no se puede generar.
 
-**Confirmado en la máquina real (2026-10-28):** menú 33 en COM2. `PARA 0x00` responde 6 bytes, uno por entrada; `PARA 0x31` lo rechaza. Estado inicial observado: `01 00 01 01 01 01` (entrada 2 en 0, el resto en 1).
+**Hallazgo:** el "ALB02" del BEEX es la tarjeta de 18 canales de los LEDs (COM2 @ 19200), cuyas 6 entradas se consultan con CMD 0x32 (`PARA 0x00` → 6 bytes, uno por entrada; `PARA 0x31` lo rechaza). COM5 no entrega nada; el código de COM5 (calibrar tramas, ping) se eliminó.
+
+**Mapa observado (log del 2026-10-29, menú 33):**
+
+- **E1 = vibración.** Reposo en 1; cada golpe baja a 0 por ~0.35–0.5 s.
+- **E2 = presencia** (probable). Cambia al acercarse o alejarse y mantiene el valor. En 1 con alguien delante, en 0 con la máquina vacía.
+- E3 siempre 1; E4–E6 cambian poco y sin patrón: sin sensor, se ignoran.
+- 2 timeouts de 300 ms en ~3.5 min: se toleran; el menú 8 avisa solo tras 3 fallos seguidos (`FallasParaAlarma`).
 
 **Pendiente:**
 
-1. Con el menú 33, abrir la puerta, cerrarla, golpear el gabinete y (si hay) acercarse al sensor de proximidad; guardar la salida para ver qué entrada cambia con cada evento y en qué sentido.
-2. Con eso, fijar en `hardware.json` el mapa entrada → evento (hoy no existe; la prueba solo imprime `ENTRADA n: a->b`) y mostrar `¡PUERTA ABIERTA!` / `¡VIBRACIÓN DETECTADA!` desde esa tarjeta.
-3. Decidir qué hacer con COM5 y `Test_CalibrarSensores` / `Test_EscucharSensores` (menú 7, 8, 16), que asumen un ALB02 aparte: eliminarlos o dejarlos solo si resulta que existe otro módulo.
-4. El formato de la respuesta de CMD 0x32 no se pudo leer del PDF del fabricante (fuentes codificadas); validar con la hoja de protocolo que "un byte por entrada, 0/1" es la interpretación correcta y qué nivel significa "activado".
-5. La opción 33 usa COM2, el mismo puerto de los LEDs: no correrla a la vez que la prueba de LEDs.
+1. Confirmar la polaridad de E2 corregida: con la máquina vacía el menú 8 mostró `¡PRESENCIA DETECTADA!` con `NivelActivoPresencia = 0`, así que ahora es 1 (E2 en 1 = alguien delante). Validar acercándose y alejándose.
+2. Correr el menú 8: debe mostrar `¡PRESENCIA DETECTADA!` / `Zona libre` y un solo `¡VIBRACIÓN DETECTADA!` por golpe (ráfagas agrupadas en `AgruparVibracionMs`).
+3. Confirmar con el instalador que E4–E6 realmente no tienen sensor.
+4. El formato de la respuesta de CMD 0x32 no se pudo leer del PDF del fabricante (fuentes codificadas); la interpretación "un byte por entrada, 0/1" es la observada en la máquina.
+5. Los menús 8 y 33 usan COM2, el mismo puerto de los LEDs: no correrlos a la vez que la prueba de LEDs.

@@ -60,16 +60,13 @@
     "RutaLogo": "logo.png"                   // relativa a la carpeta del .exe (se copia junto al build); solo usada por Test_ImprimirVoucherOperacion
   },
   "Sensores": {
-    "Puerto": "COM5",
-    "BaudRate": 9600,
-    "SilencioTramaMs": 30,
-    // Tramas en hex (ej. "AA 01 02 55"). Obtenerlas con Test_CalibrarSensores. Vacío = sin configurar.
-    "Tramas": {
-      "PUERTA_ABIERTA": "",
-      "PUERTA_CERRADA": "",
-      "VIBRACION": "",
-      "PROXIMIDAD": ""
-    }
+    // Solo existen dos sensores, en las entradas de la tarjeta de 18 canales (puerto/baudios: sección Leds). Mapa observado 2026-10-29.
+    "EntradaVibracion": 1,       // reposo en 1, pulsos a 0 de ~0.35-0.5 s por golpe
+    "EntradaPresencia": 2,       // nivel sostenido mientras hay alguien frente a la puerta
+    "NivelActivoVibracion": 0,
+    "NivelActivoPresencia": 1,   // 1 = persona detectada, 0 = libre (E2 en 0 con la máquina vacía, 2026-10-29)
+    "AgruparVibracionMs": 2000,  // pulsos más juntos que esto cuentan como un solo golpe
+    "FallasParaAlarma": 3
   },
   "Leds": {
     // Tarjeta aparte del ALB02: "18-Channel LED Light Bar Control Board" (modelo 24002-2). Confirmado en
