@@ -163,6 +163,7 @@ public static partial class HardwareTests
                 Console.WriteLine($"  Fecha de vencimiento: {doc.FechaVencimiento}");
                 if (doc.Mrz is not null) Console.WriteLine($"  MRZ                 : {doc.Mrz}");
 
+                r.Criterio("Tipo de documento identificado (pasaporte / INE / tarjeta)", doc.Mrz is not null);
                 r.Criterio("Nombre, ID y Nacionalidad extraídos (no vacíos)",
                     new[] { doc.Nombre, doc.NumeroDocumento, doc.Nacionalidad }.All(c => !string.IsNullOrWhiteSpace(c)));
                 // Dígitos verificadores de la MRZ (ICAO 9303): a diferencia del criterio anterior (que solo mira si
