@@ -84,8 +84,8 @@
     // XZG004 (item 10 BEEX). "Teclado" = HID-KBW, como llega de fábrica (en la máquina aparece como HID Keyboard VID_26F1&PID_D101).
     // Para disparar el lector bajo demanda pase a "Serial" (USB CDC / RS-232), ponga el COM en Puerto y el comando de disparo en
     // hex en ComandoActivar: el manual solo documenta códigos de programación, el comando serial hay que pedirlo al fabricante.
-    "Modo": "Teclado",
-    "Puerto": "",
+    "Modo": "Serial",   // pasado a USB CDC el 2026-11-04; el lector aparece como COM15
+    "Puerto": "COM15",
     "BaudRate": 115200,
     "ComandoActivar": "",
     "ComandoDesactivar": "",
