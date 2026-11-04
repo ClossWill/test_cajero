@@ -6,33 +6,7 @@ namespace IntegracionCajeroPruebas.Tests;
 
 public sealed record DocumentoLeido(string Nombre, string NumeroDocumento, string Nacionalidad,
     string FechaNacimiento, string FechaVencimiento, bool ChecksumValido, string? Mrz,
-    string? ImagenColor = null, string? ImagenIR = null, string? ImagenUV = null, int TipoSdk = 0)
-{
-    /// <summary>Pasaporte / INE / otra tarjeta, deducido de la MRZ (ICAO 9303), no del SDK.</summary>
-    public string TipoDocumento => ClasificarPorMrz(Mrz);
-
-    // Formato por número y largo de líneas: TD3 = 2x44 (pasaporte), TD2 = 2x36, TD1 = 3x30 (tarjeta, como el reverso de la INE).
-    // La primera letra da el tipo (P pasaporte, V visa, I/A/C tarjeta de identificación); una MRZ "IDMEX" es la INE mexicana.
-    public static string ClasificarPorMrz(string? mrz)
-    {
-        var lineas = (mrz ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (lineas.Length == 0) return "No identificado (sin MRZ: ¿se escaneó el frente de la INE?)";
-
-        var tipo = lineas[0][0];
-        if (lineas.Length == 3)
-            return lineas[0].StartsWith("IDMEX") ? "INE (credencial para votar, tarjeta TD1)"
-                 : tipo is 'I' or 'A' or 'C' ? "Tarjeta de identificación (TD1)" : "Documento TD1 no reconocido";
-        if (lineas.Length == 2)
-            return tipo switch
-            {
-                'P' => "Pasaporte",
-                'V' => "Visa",
-                'I' or 'A' or 'C' => "Tarjeta de identificación (TD2)",
-                _ => "Documento de 2 líneas no reconocido",
-            };
-        return $"MRZ de {lineas.Length} líneas no reconocida";
-    }
-}
+    string? ImagenColor = null, string? ImagenIR = null, string? ImagenUV = null, int TipoSdk = 0);
 
 /// <summary>Frontera con el SDK propietario del MEPR500+. Solo lo que la prueba necesita.</summary>
 public interface IEscanerSdk : IDisposable
@@ -181,7 +155,7 @@ public static partial class HardwareTests
                 if (!r.Criterio($"Documento detectado en {cfg.TimeoutSegundos} s", presente)) { r.Finalizar(); return; }
 
                 var doc = escaner.Leer();
-                Console.WriteLine($"  Tipo de documento   : {doc.TipoDocumento} (iType del SDK: {doc.TipoSdk})");
+                Console.WriteLine($"  Tipo de documento   : {Mrz.TipoDocumento(doc.Mrz)} (iType del SDK = {doc.TipoSdk})");
                 Console.WriteLine($"  Nombre              : {doc.Nombre}");
                 Console.WriteLine($"  ID                  : {doc.NumeroDocumento}");
                 Console.WriteLine($"  Nacionalidad        : {doc.Nacionalidad}");
@@ -192,11 +166,13 @@ public static partial class HardwareTests
                 r.Criterio("Tipo de documento identificado (pasaporte / INE / tarjeta)", doc.Mrz is not null);
                 r.Criterio("Nombre, ID y Nacionalidad extraídos (no vacíos)",
                     new[] { doc.Nombre, doc.NumeroDocumento, doc.Nacionalidad }.All(c => !string.IsNullOrWhiteSpace(c)));
-                // bCheckSum es el propio SDK validando el dígito verificador de la zona MRZ (ICAO 9303): a
-                // diferencia del criterio anterior (que solo mira si los campos vinieron no vacíos), este es el
-                // único criterio automático que garantiza que lo leído corresponde de verdad al documento, sin
-                // depender de que el asistente lo compare a ojo.
-                r.Criterio("Dígito verificador de la MRZ válido (bCheckSum del SDK)", doc.ChecksumValido);
+                // Dígitos verificadores de la MRZ (ICAO 9303): a diferencia del criterio anterior (que solo mira si
+                // los campos vinieron no vacíos), este es el único criterio automático que garantiza que lo leído
+                // corresponde de verdad al documento, sin depender de que el asistente lo compare a ojo. Se
+                // calculan aquí y no con bCheckSum del SDK, que da falsos negativos (ver Helpers/Mrz.cs).
+                var mrz = Mrz.Validar(doc.Mrz);
+                Console.WriteLine($"  bCheckSum del SDK   : {(doc.ChecksumValido ? "válido" : "inválido")} (solo informativo)");
+                r.Criterio($"Dígitos verificadores de la MRZ válidos ({mrz.Formato})", mrz.Valido, mrz.Detalle);
 
                 GuardarImagen(r, "color", doc.ImagenColor, cfg.CarpetaCapturas, obligatoria: true);
                 GuardarImagen(r, "infrarroja", doc.ImagenIR, cfg.CarpetaCapturas, obligatoria: false);

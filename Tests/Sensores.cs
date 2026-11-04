@@ -1,92 +1,104 @@
-using System.IO.Ports;
 using IntegracionCajeroPruebas.Config;
 using IntegracionCajeroPruebas.Helpers;
 using IntegracionCajeroPruebas.Protocolos;
 
 namespace IntegracionCajeroPruebas.Tests;
 
-// Módulo ALB02: escucha serial reactiva. El formato de tramas no está documentado en el repositorio,
-// así que primero se calibra (Test_CalibrarSensores) y luego se copian las tramas a hardware.json.
+// Sensores del gabinete: solo hay dos, ambos cableados a las entradas de la tarjeta de 18 canales (la misma de los LEDs,
+// COM2 @ 19200; el BEEX la llama ALB02). Se consultan con CMD 0x32: 6 bytes, uno por entrada, 0/1.
+//   - Vibración: pulsos de ~0.35-0.5 s en cada golpe (salida monoestable).
+//   - Presencia frente a la puerta: nivel sostenido mientras haya alguien o algo delante.
+// No hay contacto de puerta abierta. Entradas, nivel activo y filtros están en la sección Sensores de hardware.json.
 public static partial class HardwareTests
 {
     private static SensoresConfig Sensores => HardwareConfig.Actual.Sensores;
 
-    private static readonly Dictionary<string, string> MensajesSensor = new()
-    {
-        ["PUERTA_ABIERTA"] = "¡PUERTA ABIERTA!",
-        ["PUERTA_CERRADA"] = "Puerta cerrada",
-        ["VIBRACION"] = "¡VIBRACIÓN DETECTADA!",
-        ["PROXIMIDAD"] = "Proximidad detectada",
-    };
-
-    // El ALB02 es reactivo (solo manda tramas cuando algo lo dispara): no hay comando de consulta
-    // documentado, así que lo máximo que se puede confirmar sin manipular el gabinete es que el puerto abre.
-    public static void Test_PingSensores()
-    {
-        var r = new Reporte($"Sensores ALB02 - Ping ({Sensores.Puerto} @ {Sensores.BaudRate})");
-        try
-        {
-            using var puerto = new SerialPort(Sensores.Puerto, Sensores.BaudRate, Parity.None, 8, StopBits.One)
-                { DtrEnable = true, RtsEnable = true }; // ver CcTalk.cs: algunos adaptadores los necesitan para habilitarse
-            puerto.Open();
-            r.Criterio($"Apertura de {Sensores.Puerto} @ {Sensores.BaudRate}", puerto.IsOpen);
-        }
-        catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
-        r.Finalizar();
-    }
+    // PARA 0x00 devuelve las 6 entradas; PARA 0x31 la tarjeta lo rechaza ('N' 05). Confirmado en la máquina real (2026-10-28).
+    private const byte ParaTodasLasEntradas = 0x00;
+    private const int PeriodoSondeoMs = 150;
 
     public static void Test_EscucharSensores()
     {
-        var patrones = Sensores.Tramas
-            .Select(t => (Evento: t.Key, Patron: Consola.ParseHex(t.Value)))
-            .Where(t => t.Patron is not null)
-            .ToList();
+        var leds = HardwareConfig.Actual.Leds;
+        Consola.Titulo($"Sensores - Presencia (E{Sensores.EntradaPresencia}) y vibración (E{Sensores.EntradaVibracion}) en {leds.Puerto} @ {leds.BaudRate}");
+        Consola.Info("Acérquese al frente de la puerta y golpee el gabinete. Presione Q para terminar.");
 
-        Consola.Titulo($"Sensores ALB02 - Escucha en {Sensores.Puerto} @ {Sensores.BaudRate}");
-        if (patrones.Count == 0)
-            Consola.Aviso("Sin tramas configuradas: solo se mostrarán las tramas crudas. Use Test_CalibrarSensores.");
-        Consola.Info("Manipule la puerta / golpee el gabinete. Presione Q para terminar.");
+        using var bus = new LedControlBus(leds.Puerto, leds.BaudRate);
+        var indiceMax = Math.Max(Sensores.EntradaPresencia, Sensores.EntradaVibracion);
 
-        using var puerto = new SerialPort(Sensores.Puerto, Sensores.BaudRate, Parity.None, 8, StopBits.One)
-            { DtrEnable = true, RtsEnable = true };
-        puerto.Open();
+        bool? vibracionPrevia = null;
+        var ultimoFlancoVibracion = DateTime.MinValue;
+        var golpesAgrupados = 0;
 
-        byte[]? anterior = null;
-        SerialTramas.Escuchar(puerto, Sensores.SilencioTramaMs, QueSigaEscuchando, trama =>
+        bool? presenciaPublicada = null;   // último estado ya informado
+        bool? presenciaCandidata = null;   // estado visto en el sondeo anterior; se publica al repetirse (filtro de rebote)
+
+        var fallas = 0;
+        var fallaInformada = false;
+
+        while (!(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Q))
         {
-            if (anterior is not null && trama.AsSpan().SequenceEqual(anterior)) return; // ignora repeticiones idénticas
-            anterior = trama;
+            var r = bus.Enviar(LedControlBus.CConsultarEntradas, ParaTodasLasEntradas, 300);
+
+            // Un timeout aislado ocurre con el ruido de los golpes (2 en ~3.5 min en la máquina): solo es falla si se repite.
+            if (r is null || !r.Ok || r.Datos.Length < indiceMax)
+            {
+                if (++fallas >= Sensores.FallasParaAlarma && !fallaInformada)
+                {
+                    Consola.Error($"La tarjeta no responde ({fallas} fallos seguidos): {bus.UltimoError}");
+                    fallaInformada = true;
+                }
+                Thread.Sleep(PeriodoSondeoMs);
+                continue;
+            }
+            if (fallaInformada) Consola.Info("La tarjeta volvió a responder.");
+            fallas = 0;
+            fallaInformada = false;
 
             var hora = DateTime.Now.ToString("HH:mm:ss.fff");
-            Consola.Info($"[{hora}] RX: {Consola.Hex(trama)}");
-            foreach (var (evento, patron) in patrones)
-                if (SerialTramas.Contiene(trama, patron!))
-                    Consola.Error(MensajesSensor.GetValueOrDefault(evento, evento));
-        });
 
-        static bool QueSigaEscuchando() =>
-            !(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Q);
+            var vibrando = r.Datos[Sensores.EntradaVibracion - 1] == Sensores.NivelActivoVibracion;
+            if (vibracionPrevia == false && vibrando)
+            {
+                // Un golpe puede generar varios pulsos seguidos; solo el primero de la ráfaga se anuncia.
+                if ((DateTime.Now - ultimoFlancoVibracion).TotalMilliseconds > Sensores.AgruparVibracionMs)
+                {
+                    Consola.Error($"[{hora}] ¡VIBRACIÓN DETECTADA!" + (golpesAgrupados > 0 ? $"  (+{golpesAgrupados} pulsos en la ráfaga anterior)" : ""));
+                    golpesAgrupados = 0;
+                }
+                else golpesAgrupados++;
+            }
+            if (vibrando) ultimoFlancoVibracion = DateTime.Now;
+            vibracionPrevia = vibrando;
+
+            var hayPresencia = r.Datos[Sensores.EntradaPresencia - 1] == Sensores.NivelActivoPresencia;
+            if (hayPresencia == presenciaCandidata && hayPresencia != presenciaPublicada)
+            {
+                presenciaPublicada = hayPresencia;
+                if (hayPresencia) Consola.Error($"[{hora}] ¡PRESENCIA DETECTADA!");
+                else Consola.Info($"[{hora}] Zona libre");
+            }
+            presenciaCandidata = hayPresencia;
+
+            Thread.Sleep(PeriodoSondeoMs);
+        }
     }
 
-    // Hallazgo (2026-10-28): COM5 no entrega ni un byte en reposo. El BEEX llama "Multifunctional serial control module"
-    // al ALB02, y esa es la carpeta de la tarjeta de 18 canales (COM2): su hoja de protocolo documenta CMD 0x32, consulta
-    // de 6 entradas de sensor de 5 V. Esta prueba la sondea y muestra la respuesta cruda y qué byte/bit cambia; el formato
-    // exacto de RESP no se pudo leer del PDF, así que se descubre manipulando la puerta y golpeando el gabinete.
+    // Exploratoria: muestra la respuesta cruda de las 6 entradas y cuál cambia. Sirve para re-mapear si se cambian los sensores.
+    // Comparte COM2 con los LEDs: no correrla a la vez que la prueba de LEDs.
     public static void Test_EscucharSensoresTarjeta()
     {
         var leds = HardwareConfig.Actual.Leds;
         Consola.Titulo($"Sensores por tarjeta de 18 canales - Entradas (CMD 0x32) en {leds.Puerto} @ {leds.BaudRate}");
-        Consola.Info("Abra/cierre la puerta y golpee el gabinete. Se imprime solo cuando la respuesta cambia. Q para terminar.");
+        Consola.Info("Acérquese a la puerta y golpee el gabinete. Se imprime solo cuando la respuesta cambia. Q para terminar.");
 
         using var bus = new LedControlBus(leds.Puerto, leds.BaudRate);
-        // Confirmado en la máquina real (2026-10-28): PARA 0x00 devuelve 6 bytes (uno por entrada, 0/1); PARA 0x31 lo rechaza ('N' 05).
-        const byte para = 0x00;
         byte[]? anterior = null;
         var fallas = 0;
 
         while (!(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Q))
         {
-            var r = bus.Enviar(LedControlBus.CConsultarEntradas, para, 300);
+            var r = bus.Enviar(LedControlBus.CConsultarEntradas, ParaTodasLasEntradas, 300);
             if (r is null)
             {
                 if (fallas++ % 25 == 0) Consola.Error($"Sin respuesta: {bus.UltimoError}");
@@ -97,7 +109,7 @@ public static partial class HardwareTests
 
             if (!r.Ok)
             {
-                Consola.Error($"La tarjeta rechazó CMD 0x32 con PARA 0x{para:X2} (respuesta 'N': {Consola.Hex(r.Datos)}).");
+                Consola.Error($"La tarjeta rechazó CMD 0x32 con PARA 0x{ParaTodasLasEntradas:X2} (respuesta 'N': {Consola.Hex(r.Datos)}).");
                 return;
             }
 
@@ -112,44 +124,7 @@ public static partial class HardwareTests
                 Consola.Ok($"[{DateTime.Now:HH:mm:ss.fff}] {estado}   (RESP: {Consola.Hex(r.Datos)}){detalle}");
                 anterior = r.Datos;
             }
-            Thread.Sleep(150);
+            Thread.Sleep(PeriodoSondeoMs);
         }
-    }
-
-    // Captura qué tramas llegan en reposo y al provocar cada evento, para copiarlas a hardware.json.
-    public static void Test_CalibrarSensores()
-    {
-        Consola.Titulo($"Sensores ALB02 - Calibración en {Sensores.Puerto} @ {Sensores.BaudRate}");
-        using var puerto = new SerialPort(Sensores.Puerto, Sensores.BaudRate, Parity.None, 8, StopBits.One)
-            { DtrEnable = true, RtsEnable = true };
-        puerto.Open();
-
-        var pasos = new (string Evento, string Instruccion)[]
-        {
-            ("REPOSO", "No toque nada (puerta cerrada)."),
-            ("PUERTA_ABIERTA", "ABRA la puerta del gabinete."),
-            ("PUERTA_CERRADA", "CIERRE la puerta del gabinete."),
-            ("VIBRACION", "Golpee suavemente el gabinete."),
-        };
-
-        const int ventanaSegundos = 12;
-        foreach (var (evento, instruccion) in pasos)
-        {
-            Consola.Esperar($"  >> [{evento}] Prepárese: {instruccion} ENTER para empezar a capturar {ventanaSegundos} s...");
-            puerto.DiscardInBuffer();
-
-            var distintas = new Dictionary<string, int>();
-            var fin = DateTime.UtcNow.AddSeconds(ventanaSegundos);
-            SerialTramas.Escuchar(puerto, Sensores.SilencioTramaMs, () => DateTime.UtcNow < fin, trama =>
-            {
-                var hex = Consola.Hex(trama);
-                distintas[hex] = distintas.GetValueOrDefault(hex) + 1;
-            });
-
-            if (distintas.Count == 0) Consola.Error($"  {evento}: no llegó ningún byte (revisar puerto/baudios/cableado).");
-            foreach (var (hex, veces) in distintas)
-                Consola.Ok($"  {evento}: \"{hex}\"  (x{veces})");
-        }
-        Consola.Info("Copie las tramas propias de cada evento (las que no aparecen en REPOSO) a \"Sensores.Tramas\" en hardware.json.");
     }
 }

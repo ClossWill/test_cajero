@@ -67,7 +67,7 @@ Integración: Escucha Serial Reactiva (Puerto COM).
 
 Métodos de Prueba Requeridos:
 
-Test_EscucharSensores(): Iniciar un loop en consola que lea el puerto COM y lance un Console.WriteLine("¡PUERTA ABIERTA!") o Console.WriteLine("¡VIBRACIÓN DETECTADA!") cuando se manipule físicamente el gabinete.
+Test_EscucharSensores(): Iniciar un loop en consola que lea el puerto COM y lance un Console.WriteLine("¡PRESENCIA DETECTADA!") o Console.WriteLine("¡VIBRACIÓN DETECTADA!") cuando alguien se acerque a la puerta o se golpee el gabinete. (Solo existen esos dos sensores; no hay contacto de puerta abierta.)
 
 🎯 Estructura Esperada (Ejemplo Conceptual)
 

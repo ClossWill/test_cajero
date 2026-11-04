@@ -124,12 +124,16 @@ public sealed class ImpresoraConfig
     public string RutaLogo { get; set; } = "logo.png";
 }
 
+// Los dos sensores del gabinete están en las entradas de la tarjeta de 18 canales (puerto y baudios: sección Leds).
+// Mapa observado el 2026-10-29 con el menú 33. Presencia: E2 en 1 con alguien delante y en 0 con la máquina vacía.
 public sealed class SensoresConfig
 {
-    public string Puerto { get; set; } = "COM5";
-    public int BaudRate { get; set; } = 9600;
-    public int SilencioTramaMs { get; set; } = 30;
-    public Dictionary<string, string> Tramas { get; set; } = new();
+    public int EntradaVibracion { get; set; } = 1;         // 1..6; reposo en 1, pulsos a 0 de ~0.35-0.5 s por golpe
+    public int EntradaPresencia { get; set; } = 2;         // 1..6; nivel sostenido mientras hay alguien frente a la puerta
+    public int NivelActivoVibracion { get; set; } = 0;
+    public int NivelActivoPresencia { get; set; } = 1;
+    public int AgruparVibracionMs { get; set; } = 2000;    // pulsos separados menos que esto cuentan como un solo golpe
+    public int FallasParaAlarma { get; set; } = 3;         // sondeos sin respuesta seguidos antes de avisar que la tarjeta no responde
 }
 
 // Tarjeta "18-Channel LED Light Bar Control Board" (modelo 24002-2): no es el ALB02, es una tarjeta

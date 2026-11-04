@@ -296,10 +296,18 @@ public static partial class HardwareTests
             }
 
             var totalPedido = pedido.Sum(p => p.Cantidad);
-            if (pedido.Any(p => p.Cantidad < 1) || totalPedido > Crm.MaxBilletesPrueba)
+            if (pedido.Any(p => p.Cantidad < 1))
             {
-                r.Criterio($"Cada renglón ≥ 1 billete y el total ≤ {Crm.MaxBilletesPrueba} (límite de seguridad de la prueba)",
-                    false, $"total pedido={totalPedido}");
+                r.Criterio("Cada renglón pide al menos 1 billete", false,
+                    string.Join(", ", pedido.Select(p => $"{p.Cantidad}x{p.Moneda}{p.Denominacion}")));
+                r.Finalizar(); return;
+            }
+
+            if (totalPedido > Crm.MaxBilletesPrueba)
+            {
+                r.Criterio($"El total de billetes de la orden no supera el límite de seguridad de la prueba ({Crm.MaxBilletesPrueba})",
+                    false, $"pediste {totalPedido} billetes en total ({string.Join(" + ", pedido.Select(p => $"{p.Cantidad}x{p.Moneda}{p.Denominacion}"))}); " +
+                           $"el máximo por orden es {Crm.MaxBilletesPrueba} (ajustable en hardware.json → MaxBilletesPrueba)");
                 r.Finalizar(); return;
             }
 
