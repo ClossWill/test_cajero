@@ -53,8 +53,50 @@ public static partial class HardwareTests
         r.Finalizar();
     }
 
-    // Descubrimiento del comando de disparo: envía cada candidato con su hora y deja unos segundos para ver si el lector
-    // enciende el haz (o responde algo). Sin confirmaciones: se observa el lector directamente. Se corta con Q.
+    // Envío manual de los comandos de la guía: luz ON, espera a que el operador pulse Enter (observar el lector, y si se
+    // quiere escanear un QR, el dato aparece en pantalla) y luz OFF. Sin timeout: el apagado siempre se envía al salir.
+    public static void Test_ComandoManualQr()
+    {
+        if (!QrEsSerial)
+        {
+            Consola.Aviso("Requiere Qr.Modo = \"Serial\" (ver Qr.Puerto en hardware.json).");
+            return;
+        }
+
+        var activar = ComandoQr(Qr.ComandoActivar);
+        var desactivar = ComandoQr(Qr.ComandoDesactivar);
+        if (activar is null || desactivar is null)
+        {
+            Consola.Aviso("Qr.ComandoActivar / Qr.ComandoDesactivar vacíos en hardware.json.");
+            return;
+        }
+
+        Consola.Titulo($"Lector QR XZG004 - Comando manual en {Qr.Puerto} @ {Qr.BaudRate}");
+        try
+        {
+            using var puerto = AbrirPuertoQr();
+            puerto.DiscardInBuffer();
+            try
+            {
+                puerto.Write(activar, 0, activar.Length);
+                Consola.Paso($"[{DateTime.Now:HH:mm:ss.fff}] TX luz ON : {Encoding.ASCII.GetString(activar)}");
+                Consola.Info("Presente un QR si desea; Enter para apagar la luz y terminar.");
+
+                SerialTramas.Escuchar(puerto, Qr.SilencioTramaMs,
+                    () => !(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Enter),
+                    trama => Consola.Ok($"[{DateTime.Now:HH:mm:ss.fff}] RX: {Encoding.UTF8.GetString(trama).TrimEnd('\r', '\n')}  ({Consola.Hex(trama)})"));
+            }
+            finally
+            {
+                puerto.Write(desactivar, 0, desactivar.Length);
+                Consola.Paso($"[{DateTime.Now:HH:mm:ss.fff}] TX luz OFF: {Encoding.ASCII.GetString(desactivar)}");
+            }
+        }
+        catch (Exception ex) { Consola.Error($"Excepción: {ex.Message}"); }
+    }
+
+    // Envía cada comando de ComandosCandidatos (ASCII) con su hora y deja unos segundos para ver cómo reacciona el
+    // lector (o qué responde). Sin confirmaciones: se observa el lector directamente. Se corta con Q.
     public static void Test_ProbarComandosQr()
     {
         if (!QrEsSerial)
@@ -63,19 +105,19 @@ public static partial class HardwareTests
             return;
         }
 
-        Consola.Titulo($"Lector QR XZG004 - Prueba de comandos de disparo en {Qr.Puerto} @ {Qr.BaudRate}");
-        Consola.Info("Observe el cristal del lector: el candidato que encienda el haz es el comando de disparo. Q para terminar.");
+        Consola.Titulo($"Lector QR XZG004 - Secuencia de comandos en {Qr.Puerto} @ {Qr.BaudRate}");
+        Consola.Info("Observe el cristal del lector: la luz debe encender con ON y apagar con OFF. Q para terminar.");
         try
         {
             using var puerto = AbrirPuertoQr();
             foreach (var texto in Qr.ComandosCandidatos)
             {
-                var comando = Consola.ParseHex(texto);
+                var comando = ComandoQr(texto);
                 if (comando is null) continue;
 
                 puerto.DiscardInBuffer();
                 puerto.Write(comando, 0, comando.Length);
-                Consola.Paso($"[{DateTime.Now:HH:mm:ss.fff}] TX: {Consola.Hex(comando)}");
+                Consola.Paso($"[{DateTime.Now:HH:mm:ss.fff}] TX: {texto}  ({Consola.Hex(comando)})");
 
                 var fin = DateTime.UtcNow.AddSeconds(Qr.SegundosPorComando);
                 var cortar = false;
@@ -90,8 +132,12 @@ public static partial class HardwareTests
             }
         }
         catch (Exception ex) { Consola.Error($"Excepción: {ex.Message}"); }
-        Consola.Info("Fin. Si algún candidato encendió el haz, cópielo a Qr.ComandoActivar (y su pareja de apagado a ComandoDesactivar).");
+        Consola.Info("Fin. Si la luz no reaccionó: verifique que se escanearon los QR de configuración de la guía (COM y modo comando).");
     }
+
+    // Los comandos del XZG004 son ASCII literal ("$>:S000001.<$"), sin terminador. Vacío = no hay comando.
+    private static byte[]? ComandoQr(string? texto) =>
+        string.IsNullOrEmpty(texto) ? null : Encoding.ASCII.GetBytes(texto);
 
     private static SerialPort AbrirPuertoQr()
     {
@@ -106,8 +152,8 @@ public static partial class HardwareTests
     private static string? LeerQrSerial(TimeSpan timeout)
     {
         using var puerto = AbrirPuertoQr();
-        var activar = Consola.ParseHex(Qr.ComandoActivar);
-        var desactivar = Consola.ParseHex(Qr.ComandoDesactivar);
+        var activar = ComandoQr(Qr.ComandoActivar);
+        var desactivar = ComandoQr(Qr.ComandoDesactivar);
 
         puerto.DiscardInBuffer();
         if (activar is null)
@@ -115,7 +161,7 @@ public static partial class HardwareTests
         else
         {
             puerto.Write(activar, 0, activar.Length);
-            Consola.Info($"  >> Lector activado (TX: {Consola.Hex(activar)}).");
+            Consola.Info($"  >> Lector activado (TX: {Qr.ComandoActivar}).");
         }
         Consola.Aviso("  >> Presente el código QR frente al cristal del lector.");
 
@@ -133,7 +179,7 @@ public static partial class HardwareTests
             if (desactivar is not null)
             {
                 puerto.Write(desactivar, 0, desactivar.Length);
-                Consola.Info($"  >> Lector desactivado (TX: {Consola.Hex(desactivar)}).");
+                Consola.Info($"  >> Lector desactivado (TX: {Qr.ComandoDesactivar}).");
             }
         }
     }

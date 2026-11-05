@@ -176,21 +176,17 @@ public sealed class QrConfig
     // "Serial"  = USB CDC o RS-232: la prueba envía ComandoActivar, espera el dato y envía ComandoDesactivar.
     public string Modo { get; set; } = "Teclado";
     public string Puerto { get; set; } = "";               // solo Modo=Serial; el COM nuevo que aparece al pasar el lector a USB CDC
-    public int BaudRate { get; set; } = 115200;            // default de fábrica del manual (RS-232 / CDC)
-    public string ComandoActivar { get; set; } = "";       // hex, ej. "1B 31". Vacío = no se envía nada (el lector decide cuándo escanear)
-    public string ComandoDesactivar { get; set; } = "";    // hex; se envía al terminar o al vencer el tiempo
+    public int BaudRate { get; set; } = 9600;              // "Guía de Integración SDK XZG004 Beex": 9600 8N1
+    // Comandos en ASCII literal, sin terminador (Guía SDK XZG004 Beex §3). Vacío = no se envía nada.
+    public string ComandoActivar { get; set; } = "$>:S000001.<$";     // enciende la luz e inicia la captura
+    public string ComandoDesactivar { get; set; } = "$>:S000000.<$";  // apaga la luz; se envía al terminar o al vencer el tiempo
     public int TimeoutSegundos { get; set; } = 30;
     public int SilencioTramaMs { get; set; } = 100;        // silencio que cierra el dato (el lector puede no mandar terminador)
-    // Test_ProbarComandosQr: comandos de disparo habituales en lectores 1D/2D, SUPUESTOS (no vienen en el manual). Cuando
-    // uno encienda el haz del lector, copiarlo a ComandoActivar (y su pareja de apagado a ComandoDesactivar).
+    // Test_ProbarComandosQr: secuencia de comandos ASCII que se envían uno tras otro para observar el lector.
     public List<string> ComandosCandidatos { get; set; } = new()
     {
-        "1A 54 0D",  // SUB T CR: iniciar lectura (sugerido para módulos OEM genéricos tipo Newland; sin confirmar)
-        "1A 55 0D",  // SUB U CR: detener lectura
-        "16 54 0D",  // SYN T CR: activar disparo (estilo Honeywell/Metrologic)
-        "16 55 0D",  // SYN U CR: desactivar
-        "1B 31",     // ESC 1
-        "1B 30",     // ESC 0
+        "$>:S000001.<$",  // luz ON
+        "$>:S000000.<$",  // luz OFF
     };
     public int SegundosPorComando { get; set; } = 5;       // pausa tras cada candidato para ver si el lector reaccionó
 }

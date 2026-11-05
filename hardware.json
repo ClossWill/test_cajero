@@ -82,17 +82,18 @@
   },
   "Qr": {
     // XZG004 (item 10 BEEX). "Teclado" = HID-KBW, como llega de fábrica (en la máquina aparece como HID Keyboard VID_26F1&PID_D101).
-    // Para disparar el lector bajo demanda pase a "Serial" (USB CDC / RS-232), ponga el COM en Puerto y el comando de disparo en
-    // hex en ComandoActivar: el manual solo documenta códigos de programación, el comando serial hay que pedirlo al fabricante.
+    // Modo "Serial" según "Guía de Integración SDK XZG004 Beex": previamente escanear los QR de configuración
+    // $>:S010201.<$ (puerto serie COM, desactiva HID) y $>:S030000.<$ (modo comando, luz apagada en reposo).
+    // Los comandos son ASCII literal, sin terminador.
     "Modo": "Serial",   // pasado a USB CDC el 2026-11-04; el lector aparece como COM15
     "Puerto": "COM15",
-    "BaudRate": 115200,
-    "ComandoActivar": "",
-    "ComandoDesactivar": "",
+    "BaudRate": 9600,   // 8N1 según la guía
+    "ComandoActivar": "$>:S000001.<$",     // luz ON + inicia captura
+    "ComandoDesactivar": "$>:S000000.<$",  // luz OFF + reposo
     "TimeoutSegundos": 30,
     "SilencioTramaMs": 100,
-    // Opción 32: candidatos supuestos (no vienen en el manual); el que encienda el haz va a ComandoActivar.
-    "ComandosCandidatos": [ "1A 54 0D", "1A 55 0D", "16 54 0D", "16 55 0D", "1B 31", "1B 30" ],
+    // Opción 32: secuencia de comandos ASCII para ver el lector reaccionar (luz ON, luego OFF).
+    "ComandosCandidatos": [ "$>:S000001.<$", "$>:S000000.<$" ],
     "SegundosPorComando": 5
   },
   "Camara": {
