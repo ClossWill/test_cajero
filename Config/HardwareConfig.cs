@@ -185,6 +185,8 @@ public sealed class QrConfig
     // uno encienda el haz del lector, copiarlo a ComandoActivar (y su pareja de apagado a ComandoDesactivar).
     public List<string> ComandosCandidatos { get; set; } = new()
     {
+        "1A 54 0D",  // SUB T CR: iniciar lectura (sugerido para módulos OEM genéricos tipo Newland; sin confirmar)
+        "1A 55 0D",  // SUB U CR: detener lectura
         "16 54 0D",  // SYN T CR: activar disparo (estilo Honeywell/Metrologic)
         "16 55 0D",  // SYN U CR: desactivar
         "1B 31",     // ESC 1

@@ -92,7 +92,7 @@
     "TimeoutSegundos": 30,
     "SilencioTramaMs": 100,
     // Opción 32: candidatos supuestos (no vienen en el manual); el que encienda el haz va a ComandoActivar.
-    "ComandosCandidatos": [ "16 54 0D", "16 55 0D", "1B 31", "1B 30" ],
+    "ComandosCandidatos": [ "1A 54 0D", "1A 55 0D", "16 54 0D", "16 55 0D", "1B 31", "1B 30" ],
     "SegundosPorComando": 5
   },
   "Camara": {
