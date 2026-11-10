@@ -173,20 +173,27 @@ public sealed class QrConfig
 {
     // "Teclado" = HID-KBW (como llega de fábrica según el BEEX): el lector "teclea" el contenido en la consola; no hay
     //             canal de comandos, así que la prueba solo abre una ventana de captura y descarta lo tecleado antes.
-    // "Serial"  = USB CDC o RS-232: la prueba envía ComandoActivar, espera el dato y envía ComandoDesactivar.
+    // "Serial"  = USB CDC o RS-232: la prueba envía ComandosPreparar y ComandosActivar, espera el dato y envía ComandosDesactivar.
     public string Modo { get; set; } = "Teclado";
     public string Puerto { get; set; } = "";               // solo Modo=Serial; el COM nuevo que aparece al pasar el lector a USB CDC
-    public int BaudRate { get; set; } = 9600;              // "Guía de Integración SDK XZG004 Beex": 9600 8N1
-    // Comandos en ASCII literal, sin terminador (Guía SDK XZG004 Beex §3). Vacío = no se envía nada.
-    public string ComandoActivar { get; set; } = "$>:S000001.<$";     // enciende la luz e inicia la captura
-    public string ComandoDesactivar { get; set; } = "$>:S000000.<$";  // apaga la luz; se envía al terminar o al vencer el tiempo
+    public int BaudRate { get; set; } = 115200;            // "Command Mode Usage Instructions" (proveedor): 115200 por defecto
+    // Comandos en ASCII literal, sin terminador. Se guardan SIN envoltorio, tal como los lista "Command Mode Usage
+    // Instructions.pdf" (proveedor). Cada lista se envía en orden, con PausaEntreComandosMs entre comandos. Vacía = no
+    // se envía nada.
+    // Envoltorio = true: cada código se envía como "$>:" + código + ".<$" (el formato de los códigos de programación del
+    // manual). false: se envía el código tal cual ("SW00001"). El documento no aclara cuál acepta el lector por serial,
+    // por eso es un interruptor (la opción 38 del menú lo alterna en ejecución).
+    public bool Envoltorio { get; set; } = true;
+    // Bloque de luz: S0C0400 = encendida solo mientras lee (S0C0800 fija, S0C0C00 parpadeo, S0C0000 apagada).
+    // Se envía antes de ComandosActivar; vaciarlo para probar si basta configurarlo una sola vez.
+    public List<string> ComandosPreparar { get; set; } = new()
+    {
+        "BATCHST", "S01010F", "S0C0400", "S01000F", "BATCHET",
+    };
+    public List<string> ComandosActivar { get; set; } = new() { "SW00001" };      // inicia la lectura (continua)
+    public List<string> ComandosDesactivar { get; set; } = new() { "SWFFFFF" };  // detiene la lectura; al terminar o vencer el tiempo
+    public int PausaEntreComandosMs { get; set; } = 50;    // el documento no indica pausa mínima entre comandos del bloque
     public int TimeoutSegundos { get; set; } = 30;
     public int SilencioTramaMs { get; set; } = 100;        // silencio que cierra el dato (el lector puede no mandar terminador)
-    // Test_ProbarComandosQr: secuencia de comandos ASCII que se envían uno tras otro para observar el lector.
-    public List<string> ComandosCandidatos { get; set; } = new()
-    {
-        "$>:S000001.<$",  // luz ON
-        "$>:S000000.<$",  // luz OFF
-    };
-    public int SegundosPorComando { get; set; } = 5;       // pausa tras cada candidato para ver si el lector reaccionó
+    public int SegundosPorComando { get; set; } = 5;       // Test_ProbarComandosQr: segundos de observación tras activar y tras desactivar
 }

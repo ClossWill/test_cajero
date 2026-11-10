@@ -82,19 +82,24 @@
   },
   "Qr": {
     // XZG004 (item 10 BEEX). "Teclado" = HID-KBW, como llega de fábrica (en la máquina aparece como HID Keyboard VID_26F1&PID_D101).
-    // Modo "Serial" según "Guía de Integración SDK XZG004 Beex": previamente escanear los QR de configuración
-    // $>:S010201.<$ (puerto serie COM, desactiva HID) y $>:S030000.<$ (modo comando, luz apagada en reposo).
-    // Los comandos son ASCII literal, sin terminador.
+    // Modo "Serial" según "Command Mode Usage Instructions.pdf" (proveedor). Configuración previa del lector, en este
+    // orden, escaneando del "XZG Quick Setup Manual": "USB Virtual Serial Port" ($>:S0F0216.<$) y "Key Mode"
+    // (BATCHST, S01010F, S03001A, S030000, S01000F, BATCHET). No escanear otros códigos entre medio.
+    // Los comandos son ASCII literal, sin terminador. Se escriben sin envoltorio, como en el documento del proveedor.
+    // "Envoltorio": true los envía como $>:código.<$ ; false, el código tal cual (SW00001). No está confirmado cuál acepta
+    // el lector por serial: probar ambos (la opción 38 del menú alterna en ejecución).
     "Modo": "Serial",   // pasado a USB CDC el 2026-11-04; el lector aparece como COM15
     "Puerto": "COM15",
-    "BaudRate": 9600,   // 8N1 según la guía
-    "ComandoActivar": "$>:S000001.<$",     // luz ON + inicia captura
-    "ComandoDesactivar": "$>:S000000.<$",  // luz OFF + reposo
+    "BaudRate": 115200, // 8N1; por defecto según el proveedor
+    // Bloque de luz (antes de activar): S0C0400 = luz encendida solo mientras lee. Vaciar para probar sin él.
+    "Envoltorio": true,
+    "ComandosPreparar": [ "BATCHST", "S01010F", "S0C0400", "S01000F", "BATCHET" ],
+    "ComandosActivar": [ "SW00001" ],      // inicia la lectura (continua)
+    "ComandosDesactivar": [ "SWFFFFF" ],   // detiene la lectura
+    "PausaEntreComandosMs": 50,
     "TimeoutSegundos": 30,
     "SilencioTramaMs": 100,
-    // Opción 32: secuencia de comandos ASCII para ver el lector reaccionar (luz ON, luego OFF).
-    "ComandosCandidatos": [ "$>:S000001.<$", "$>:S000000.<$" ],
-    "SegundosPorComando": 5
+    "SegundosPorComando": 5   // opción 32: segundos de observación tras activar y tras desactivar
   },
   "Camara": {
     // Item 12 del BEEX (GDZS-DC004-MG3021): webcam USB estándar, sin SDK propio.

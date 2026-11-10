@@ -60,8 +60,9 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
     {
         ("30", "Leer código QR (activa el lector solo durante la prueba)", HardwareTests.Test_LeerQr),
         ("31", "Ping (abre el puerto; solo Qr.Modo = Serial)", HardwareTests.Test_PingQr),
-        ("32", "Secuencia de comandos luz ON/OFF (ComandosCandidatos; solo Qr.Modo = Serial)", HardwareTests.Test_ProbarComandosQr),
-        ("37", "Comando manual: luz ON, Enter para luz OFF (solo Qr.Modo = Serial)", HardwareTests.Test_ComandoManualQr),
+        ("32", "Secuencia activar/desactivar (comandos del proveedor; solo Qr.Modo = Serial)", HardwareTests.Test_ProbarComandosQr),
+        ("37", "Comando manual: activar lectura, Enter para detenerla (solo Qr.Modo = Serial)", HardwareTests.Test_ComandoManualQr),
+        ("38", "Alternar envoltorio de comandos: con $>:...<$ / sin él (en memoria)", HardwareTests.Test_AlternarEnvoltorioQr),
     }),
     ("LEDs", new (string Clave, string Texto, Action Accion)[]
     {
