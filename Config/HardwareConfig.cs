@@ -188,6 +188,9 @@ public sealed class QrConfig
     // (cada comando termina en ";" salvo BATCHST). false: un comando por escritura, con PausaEntreComandosMs. La opción 39
     // del menú lo alterna en ejecución. ComandosActivar/Desactivar siempre van aparte.
     public bool PrepararEnLote { get; set; } = true;
+    // Terminador agregado tras cada escritura (cada comando o el lote completo): "Ninguno" | "CR" | "LF" | "CRLF". El
+    // documento del proveedor no indica ninguno; la opción 40 del menú prueba las combinaciones.
+    public string Terminador { get; set; } = "Ninguno";
     // Bloque de luz: S0C0400 = encendida solo mientras lee (S0C0800 fija, S0C0C00 parpadeo, S0C0000 apagada).
     // Se envía antes de ComandosActivar; vaciarlo para probar si basta configurarlo una sola vez.
     public List<string> ComandosPreparar { get; set; } = new()

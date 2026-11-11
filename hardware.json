@@ -93,6 +93,7 @@
     "BaudRate": 115200, // 8N1; por defecto según el proveedor
     // Bloque de luz (antes de activar): S0C0400 = luz encendida solo mientras lee. Vaciar para probar sin él.
     "Envoltorio": true,
+    "Terminador": "Ninguno",   // Ninguno | CR | LF | CRLF (tras cada escritura); la opción 40 prueba las combinaciones
     "PrepararEnLote": true,   // el bloque de luz va como una sola cadena con ';' (formato Batch Programming); false = comando por comando
     "ComandosPreparar": [ "BATCHST", "S01010F", "S0C0400", "S01000F", "BATCHET" ],
     "ComandosActivar": [ "SW00001" ],      // inicia la lectura (continua)

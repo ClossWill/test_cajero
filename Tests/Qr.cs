@@ -172,7 +172,7 @@ public static partial class HardwareTests
         }
         if (lote.Length == 0) return;
 
-        var bytes = Encoding.ASCII.GetBytes(lote.ToString());
+        var bytes = Encoding.ASCII.GetBytes(lote.ToString()).Concat(TerminadorQr).ToArray();
         puerto.Write(bytes, 0, bytes.Length);
         Consola.Paso($"[{DateTime.Now:HH:mm:ss.fff}] TX (lote): {lote}  ({bytes.Length} bytes)");
         EsperarRespuestaQr(puerto);
@@ -196,6 +196,58 @@ public static partial class HardwareTests
         Consola.Info($"      RX: {DescribirRxQr(rx[..n])}");
     }
 
+    private static byte[] TerminadorQr => Qr.Terminador.ToUpperInvariant() switch
+    {
+        "CR" => new byte[] { 13 },
+        "LF" => new byte[] { 10 },
+        "CRLF" => new byte[] { 13, 10 },
+        _ => Array.Empty<byte>(),
+    };
+
+    // Sondeo de formatos: el lector contesta NAK (0x15) a lo que no entiende. Envía solo el disparo y la detención
+    // (inofensivos, no tocan la configuración) con cada combinación de velocidad, envoltorio y terminador, y marca las
+    // que NO reciben puro NAK. Mirar también la luz del lector. Los valores de Qr se restauran al terminar.
+    public static void Test_SondearFormatosQr()
+    {
+        if (!QrEsSerial || Qr.ComandosActivar.Count == 0 || Qr.ComandosDesactivar.Count == 0)
+        {
+            Consola.Aviso("Requiere Qr.Modo = \"Serial\" y Qr.ComandosActivar / ComandosDesactivar en hardware.json.");
+            return;
+        }
+
+        var (baud0, env0, term0) = (Qr.BaudRate, Qr.Envoltorio, Qr.Terminador);
+        var bauds = new[] { 115200, 9600 };
+        var terminadores = new[] { "Ninguno", "CR", "CRLF" };
+        Consola.Titulo($"Lector QR XZG004 - Sondeo de formatos en {Qr.Puerto} (solo {Qr.ComandosActivar[0]} / {Qr.ComandosDesactivar[0]})");
+        try
+        {
+            foreach (var baud in bauds)
+            foreach (var envoltorio in new[] { true, false })
+            foreach (var term in terminadores)
+            {
+                (Qr.BaudRate, Qr.Envoltorio, Qr.Terminador) = (baud, envoltorio, term);
+                var etiqueta = $"{baud} baud, envoltorio {(envoltorio ? "sí" : "no")}, terminador {term}";
+                Consola.Paso($"--- {etiqueta} ---");
+                try
+                {
+                    using var puerto = AbrirPuertoQr();
+                    puerto.DiscardInBuffer();
+                    EnviarComandosQr(puerto, Qr.ComandosActivar);
+                    Thread.Sleep(1500); // tiempo para ver si la luz enciende
+                    var tarde = new byte[puerto.BytesToRead];
+                    var n = puerto.Read(tarde, 0, tarde.Length);
+                    if (n > 0) Consola.Info($"      RX posterior: {DescribirRxQr(tarde[..n])}");
+                    EnviarComandosQr(puerto, Qr.ComandosDesactivar);
+                    Thread.Sleep(300);
+                    puerto.DiscardInBuffer();
+                }
+                catch (Exception ex) { Consola.Error($"  {ex.Message}"); }
+            }
+        }
+        finally { (Qr.BaudRate, Qr.Envoltorio, Qr.Terminador) = (baud0, env0, term0); }
+        Consola.Info("Fin del sondeo. Anote en qué combinación la luz encendió o la respuesta no fue puro NAK (06 = ACK, 15 = NAK) y póngala en hardware.json.");
+    }
+
     // Con Envoltorio: "$>:" + código + ".<$"; sin él, el código tal cual.
     private static string FormatoQr(string codigo) => Qr.Envoltorio ? $"$>:{codigo}.<$" : codigo;
 
@@ -207,9 +259,9 @@ public static partial class HardwareTests
         {
             if (string.IsNullOrEmpty(codigo)) continue;
             var texto = FormatoQr(codigo);
-            var bytes = Encoding.ASCII.GetBytes(texto);
+            var bytes = Encoding.ASCII.GetBytes(texto).Concat(TerminadorQr).ToArray();
             puerto.Write(bytes, 0, bytes.Length);
-            Consola.Paso($"[{DateTime.Now:HH:mm:ss.fff}] TX: {texto}  ({bytes.Length} bytes)");
+            Consola.Paso($"[{DateTime.Now:HH:mm:ss.fff}] TX: {texto}  ({bytes.Length} bytes, terminador {Qr.Terminador})");
             EsperarRespuestaQr(puerto);
         }
     }
