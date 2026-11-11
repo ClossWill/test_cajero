@@ -65,6 +65,7 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
         ("38", "Alternar envoltorio de comandos: con $>:...<$ / sin él (en memoria)", HardwareTests.Test_AlternarEnvoltorioQr),
         ("40", "Sondeo de formatos: velocidad x envoltorio x terminador (solo disparo/detención; observar la luz)", HardwareTests.Test_SondearFormatosQr),
         ("41", "Sondeo con códigos del manual (S01010F, S0C0400, S01000F) x velocidad x envoltorio x terminador", HardwareTests.Test_SondearCodigosManualQr),
+        ("42", "Sondeo en LOTE (BATCHST;...;BATCHET en una cadena) x velocidad x envoltorio x terminador", HardwareTests.Test_SondearLoteQr),
         ("39","Alternar bloque de luz: una sola cadena en lote / comandos separados (en memoria)", HardwareTests.Test_AlternarLoteQr),
     }),
     ("LEDs", new (string Clave, string Texto, Action Accion)[]

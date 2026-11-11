@@ -164,8 +164,14 @@ public static partial class HardwareTests
             return;
         }
 
+        EnviarLoteQr(puerto, Qr.ComandosPreparar);
+    }
+
+    // Una sola cadena: cada código seguido de ";" salvo BATCHST (formato "Batch Programming" del manual).
+    private static void EnviarLoteQr(SerialPort puerto, IEnumerable<string> codigos)
+    {
         var lote = new StringBuilder();
-        foreach (var codigo in Qr.ComandosPreparar.Where(c => !string.IsNullOrEmpty(c)))
+        foreach (var codigo in codigos.Where(c => !string.IsNullOrEmpty(c)))
         {
             lote.Append(FormatoQr(codigo));
             if (!codigo.Equals("BATCHST", StringComparison.OrdinalIgnoreCase)) lote.Append(';');
@@ -223,7 +229,13 @@ public static partial class HardwareTests
     public static void Test_SondearCodigosManualQr() =>
         SondearQr("códigos del manual: S01010F, S0C0400, S01000F", new[] { "S01010F", "S0C0400" }, new[] { "S01000F" }, new[] { true, false });
 
-    private static void SondearQr(string descripcion, IReadOnlyList<string> enviar, IReadOnlyList<string> cerrar, bool[] envoltorios)
+    // Igual que la 41 pero enviando BATCHST ... BATCHET como UNA sola cadena con ";" (formato del manual). Es lo que
+    // el proveedor llama "bloque"; el lote ya se probó solo con envoltorio, sin terminador y a 115200.
+    public static void Test_SondearLoteQr() =>
+        SondearQr("lote: BATCHST;S01010F;S0C0400;S01000F;BATCHET", new[] { "BATCHST", "S01010F", "S0C0400", "S01000F", "BATCHET" },
+            new[] { "S01000F" }, new[] { true, false }, enLote: true);
+
+    private static void SondearQr(string descripcion, IReadOnlyList<string> enviar, IReadOnlyList<string> cerrar, bool[] envoltorios, bool enLote = false)
     {
         if (!QrEsSerial)
         {
@@ -249,7 +261,7 @@ public static partial class HardwareTests
                     puerto.DiscardInBuffer();
                     try
                     {
-                        EnviarComandosQr(puerto, enviar);
+                        if (enLote) EnviarLoteQr(puerto, enviar); else EnviarComandosQr(puerto, enviar);
                         Thread.Sleep(1500); // tiempo para ver si la luz enciende
                         var tarde = new byte[puerto.BytesToRead];
                         var n = puerto.Read(tarde, 0, tarde.Length);
