@@ -209,35 +209,56 @@ public static partial class HardwareTests
     // que NO reciben puro NAK. Mirar también la luz del lector. Los valores de Qr se restauran al terminar.
     public static void Test_SondearFormatosQr()
     {
-        if (!QrEsSerial || Qr.ComandosActivar.Count == 0 || Qr.ComandosDesactivar.Count == 0)
+        if (Qr.ComandosActivar.Count == 0 || Qr.ComandosDesactivar.Count == 0)
         {
-            Consola.Aviso("Requiere Qr.Modo = \"Serial\" y Qr.ComandosActivar / ComandosDesactivar en hardware.json.");
+            Consola.Aviso("Qr.ComandosActivar / ComandosDesactivar vacíos en hardware.json.");
+            return;
+        }
+        SondearQr($"solo {Qr.ComandosActivar[0]} / {Qr.ComandosDesactivar[0]}", Qr.ComandosActivar, Qr.ComandosDesactivar, new[] { true, false });
+    }
+
+    // Igual, pero con códigos que SÍ están en el manual (pág. de configuración): entrar a configuración (S01010F),
+    // iluminación "Normal" (S0C0400, el valor de fábrica) y salir (S01000F). Si estos tampoco reciben ACK, el problema
+    // no es el comando de disparo sino cómo se envía (formato, terminador, velocidad) o el modo del lector.
+    public static void Test_SondearCodigosManualQr() =>
+        SondearQr("códigos del manual: S01010F, S0C0400, S01000F", new[] { "S01010F", "S0C0400" }, new[] { "S01000F" }, new[] { true, false });
+
+    private static void SondearQr(string descripcion, IReadOnlyList<string> enviar, IReadOnlyList<string> cerrar, bool[] envoltorios)
+    {
+        if (!QrEsSerial)
+        {
+            Consola.Aviso("Requiere Qr.Modo = \"Serial\" (ver Qr.Puerto en hardware.json).");
             return;
         }
 
         var (baud0, env0, term0) = (Qr.BaudRate, Qr.Envoltorio, Qr.Terminador);
         var bauds = new[] { 115200, 9600 };
         var terminadores = new[] { "Ninguno", "CR", "CRLF" };
-        Consola.Titulo($"Lector QR XZG004 - Sondeo de formatos en {Qr.Puerto} (solo {Qr.ComandosActivar[0]} / {Qr.ComandosDesactivar[0]})");
+        Consola.Titulo($"Lector QR XZG004 - Sondeo de formatos en {Qr.Puerto} ({descripcion})");
         try
         {
             foreach (var baud in bauds)
-            foreach (var envoltorio in new[] { true, false })
+            foreach (var envoltorio in envoltorios)
             foreach (var term in terminadores)
             {
                 (Qr.BaudRate, Qr.Envoltorio, Qr.Terminador) = (baud, envoltorio, term);
-                var etiqueta = $"{baud} baud, envoltorio {(envoltorio ? "sí" : "no")}, terminador {term}";
-                Consola.Paso($"--- {etiqueta} ---");
+                Consola.Paso($"--- {baud} baud, envoltorio {(envoltorio ? "sí" : "no")}, terminador {term} ---");
                 try
                 {
                     using var puerto = AbrirPuertoQr();
                     puerto.DiscardInBuffer();
-                    EnviarComandosQr(puerto, Qr.ComandosActivar);
-                    Thread.Sleep(1500); // tiempo para ver si la luz enciende
-                    var tarde = new byte[puerto.BytesToRead];
-                    var n = puerto.Read(tarde, 0, tarde.Length);
-                    if (n > 0) Consola.Info($"      RX posterior: {DescribirRxQr(tarde[..n])}");
-                    EnviarComandosQr(puerto, Qr.ComandosDesactivar);
+                    try
+                    {
+                        EnviarComandosQr(puerto, enviar);
+                        Thread.Sleep(1500); // tiempo para ver si la luz enciende
+                        var tarde = new byte[puerto.BytesToRead];
+                        var n = puerto.Read(tarde, 0, tarde.Length);
+                        if (n > 0) Consola.Info($"      RX posterior: {DescribirRxQr(tarde[..n])}");
+                    }
+                    finally
+                    {
+                        EnviarComandosQr(puerto, cerrar); // nunca dejar el lector en modo configuración / leyendo
+                    }
                     Thread.Sleep(300);
                     puerto.DiscardInBuffer();
                 }
