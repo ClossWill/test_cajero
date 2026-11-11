@@ -83,7 +83,7 @@ public static partial class HardwareTests
 
                 SerialTramas.Escuchar(puerto, Qr.SilencioTramaMs,
                     () => !(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Enter),
-                    trama => Consola.Ok($"[{DateTime.Now:HH:mm:ss.fff}] RX: {Encoding.UTF8.GetString(trama).TrimEnd('\r', '\n')}  ({Consola.Hex(trama)})"));
+                    trama => Consola.Ok($"[{DateTime.Now:HH:mm:ss.fff}] RX: {DescribirRxQr(trama)}"));
             }
             finally
             {
@@ -127,7 +127,7 @@ public static partial class HardwareTests
                         if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Q) cortar = true;
                         return !cortar && DateTime.UtcNow < fin;
                     },
-                    trama => Consola.Ok($"[{DateTime.Now:HH:mm:ss.fff}] RX: {Consola.Hex(trama)}"));
+                    trama => Consola.Ok($"[{DateTime.Now:HH:mm:ss.fff}] RX: {DescribirRxQr(trama)}"));
                 if (cortar)
                 {
                     // Si se corta antes de desactivar, el lector no debe quedar leyendo.
@@ -174,8 +174,26 @@ public static partial class HardwareTests
 
         var bytes = Encoding.ASCII.GetBytes(lote.ToString());
         puerto.Write(bytes, 0, bytes.Length);
-        Consola.Paso($"[{DateTime.Now:HH:mm:ss.fff}] TX (lote): {lote}");
+        Consola.Paso($"[{DateTime.Now:HH:mm:ss.fff}] TX (lote): {lote}  ({bytes.Length} bytes)");
+        EsperarRespuestaQr(puerto);
+    }
+
+    // El lector responde a los comandos con bytes de control (ACK 0x06 / NAK 0x15), no con datos de un código.
+    private static bool EsRespuestaDeControlQr(byte[] t) => t.Length > 0 && t.All(b => b == 0x06 || b == 0x15);
+
+    private static string DescribirRxQr(byte[] t) =>
+        EsRespuestaDeControlQr(t)
+            ? $"respuesta del lector: {t.Count(b => b == 0x06)}×ACK(06) {t.Count(b => b == 0x15)}×NAK(15)"
+            : $"{Encoding.UTF8.GetString(t).TrimEnd('\r', '\n')}  ({Consola.Hex(t)})";
+
+    // Tras cada envío: pausa y se muestra lo que el lector contestó (sirve para ver qué comando acepta y cuál rechaza).
+    private static void EsperarRespuestaQr(SerialPort puerto)
+    {
         Thread.Sleep(Qr.PausaEntreComandosMs);
+        if (puerto.BytesToRead == 0) { Consola.Info("      (sin respuesta)"); return; }
+        var rx = new byte[puerto.BytesToRead];
+        var n = puerto.Read(rx, 0, rx.Length);
+        Consola.Info($"      RX: {DescribirRxQr(rx[..n])}");
     }
 
     // Con Envoltorio: "$>:" + código + ".<$"; sin él, el código tal cual.
@@ -191,8 +209,8 @@ public static partial class HardwareTests
             var texto = FormatoQr(codigo);
             var bytes = Encoding.ASCII.GetBytes(texto);
             puerto.Write(bytes, 0, bytes.Length);
-            Consola.Paso($"[{DateTime.Now:HH:mm:ss.fff}] TX: {texto}");
-            Thread.Sleep(Qr.PausaEntreComandosMs);
+            Consola.Paso($"[{DateTime.Now:HH:mm:ss.fff}] TX: {texto}  ({bytes.Length} bytes)");
+            EsperarRespuestaQr(puerto);
         }
     }
 
@@ -225,7 +243,12 @@ public static partial class HardwareTests
         {
             byte[]? recibido = null;
             var fin = DateTime.UtcNow + timeout;
-            SerialTramas.Escuchar(puerto, Qr.SilencioTramaMs, () => recibido is null && DateTime.UtcNow < fin, t => recibido = t);
+            SerialTramas.Escuchar(puerto, Qr.SilencioTramaMs, () => recibido is null && DateTime.UtcNow < fin, t =>
+            {
+                // ACK/NAK no son un código leído: se muestran y se sigue esperando.
+                if (EsRespuestaDeControlQr(t)) { Consola.Info($"  RX: {DescribirRxQr(t)} (ignorado)"); return; }
+                recibido = t;
+            });
             if (recibido is null) return null;
             Consola.Info($"  RX: {Consola.Hex(recibido)}");
             return Encoding.UTF8.GetString(recibido).TrimEnd('\r', '\n');
