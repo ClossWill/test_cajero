@@ -195,7 +195,7 @@ public sealed class QrConfig
     // Se envía antes de ComandosActivar; vaciarlo para probar si basta configurarlo una sola vez.
     public List<string> ComandosPreparar { get; set; } = new()
     {
-        "BATCHST", "S01010F", "S0C0400", "S01000F", "BATCHET",
+        "BATCHST", "S01010F", "S020029", "S010029", "S0C0400", "S01000F", "BATCHET",   // S020029 / S010029: tonos apagados (opcionales)
     };
     public List<string> ComandosActivar { get; set; } = new() { "SW00001" };      // inicia la lectura (continua)
     public List<string> ComandosDesactivar { get; set; } = new() { "SWFFFFF" };  // detiene la lectura; al terminar o vencer el tiempo

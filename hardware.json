@@ -95,7 +95,7 @@
     "Envoltorio": true,
     "Terminador": "Ninguno",   // Ninguno | CR | LF | CRLF (tras cada escritura); la opción 40 prueba las combinaciones
     "PrepararEnLote": true,   // el bloque de luz va como una sola cadena con ';' (formato Batch Programming); false = comando por comando
-    "ComandosPreparar": [ "BATCHST", "S01010F", "S0C0400", "S01000F", "BATCHET" ],
+    "ComandosPreparar": [ "BATCHST", "S01010F", "S020029", "S010029", "S0C0400", "S01000F", "BATCHET" ],   // S020029 / S010029: tonos apagados (opcionales según el proveedor)
     "ComandosActivar": [ "SW00001" ],      // inicia la lectura (continua)
     "ComandosDesactivar": [ "SWFFFFF" ],   // detiene la lectura
     "PausaEntreComandosMs": 50,
