@@ -77,7 +77,7 @@ public static partial class HardwareTests
             puerto.DiscardInBuffer();
             try
             {
-                EnviarComandosQr(puerto, Qr.ComandosPreparar);
+                EnviarPrepararQr(puerto);
                 EnviarComandosQr(puerto, Qr.ComandosActivar);
                 Consola.Info("Presente un QR si desea; Enter para detener la lectura y terminar.");
 
@@ -108,16 +108,16 @@ public static partial class HardwareTests
         try
         {
             using var puerto = AbrirPuertoQr();
-            var fases = new (string Nombre, IEnumerable<string>[] Comandos)[]
+            var fases = new (string Nombre, Action<SerialPort>[] Pasos)[]
             {
-                ("Activar", new IEnumerable<string>[] { Qr.ComandosPreparar, Qr.ComandosActivar }),
-                ("Desactivar", new IEnumerable<string>[] { Qr.ComandosDesactivar }),
+                ("Activar", new Action<SerialPort>[] { EnviarPrepararQr, p => EnviarComandosQr(p, Qr.ComandosActivar) }),
+                ("Desactivar", new Action<SerialPort>[] { p => EnviarComandosQr(p, Qr.ComandosDesactivar) }),
             };
-            foreach (var (nombre, comandos) in fases)
+            foreach (var (nombre, pasos) in fases)
             {
                 puerto.DiscardInBuffer();
                 Consola.Paso($"--- {nombre} ---");
-                foreach (var lista in comandos) EnviarComandosQr(puerto, lista);
+                foreach (var paso in pasos) paso(puerto);
 
                 var fin = DateTime.UtcNow.AddSeconds(Qr.SegundosPorComando);
                 var cortar = false;
@@ -145,6 +145,37 @@ public static partial class HardwareTests
     {
         Qr.Envoltorio = !Qr.Envoltorio;
         Consola.Info($"Envoltorio {(Qr.Envoltorio ? "ACTIVADO" : "DESACTIVADO")}: ahora se envía {FormatoQr("SW00001")}");
+    }
+
+    // Alterna Qr.PrepararEnLote solo en memoria: bloque de luz como una sola cadena con ";" o comando por comando.
+    public static void Test_AlternarLoteQr()
+    {
+        Qr.PrepararEnLote = !Qr.PrepararEnLote;
+        Consola.Info($"Bloque de luz en {(Qr.PrepararEnLote ? "LOTE (una sola cadena con ';')" : "comandos SEPARADOS")}.");
+    }
+
+    // Envía ComandosPreparar. En lote, como el formato de "Batch Programming" del manual: una sola cadena, cada comando
+    // seguido de ";" salvo BATCHST (ej. $>:BATCHST.<$$>:S01010F.<$;...;$>:BATCHET.<$;). Si no, uno por uno.
+    private static void EnviarPrepararQr(SerialPort puerto)
+    {
+        if (!Qr.PrepararEnLote)
+        {
+            EnviarComandosQr(puerto, Qr.ComandosPreparar);
+            return;
+        }
+
+        var lote = new StringBuilder();
+        foreach (var codigo in Qr.ComandosPreparar.Where(c => !string.IsNullOrEmpty(c)))
+        {
+            lote.Append(FormatoQr(codigo));
+            if (!codigo.Equals("BATCHST", StringComparison.OrdinalIgnoreCase)) lote.Append(';');
+        }
+        if (lote.Length == 0) return;
+
+        var bytes = Encoding.ASCII.GetBytes(lote.ToString());
+        puerto.Write(bytes, 0, bytes.Length);
+        Consola.Paso($"[{DateTime.Now:HH:mm:ss.fff}] TX (lote): {lote}");
+        Thread.Sleep(Qr.PausaEntreComandosMs);
     }
 
     // Con Envoltorio: "$>:" + código + ".<$"; sin él, el código tal cual.
@@ -184,7 +215,7 @@ public static partial class HardwareTests
             Consola.Aviso("  >> Qr.ComandosActivar vacío: no se dispara el lector; solo se espera lo que él envíe.");
         else
         {
-            EnviarComandosQr(puerto, Qr.ComandosPreparar);
+            EnviarPrepararQr(puerto);
             EnviarComandosQr(puerto, Qr.ComandosActivar);
             Consola.Info("  >> Lector activado.");
         }

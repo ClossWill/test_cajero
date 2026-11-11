@@ -184,6 +184,10 @@ public sealed class QrConfig
     // manual). false: se envía el código tal cual ("SW00001"). El documento no aclara cuál acepta el lector por serial,
     // por eso es un interruptor (la opción 38 del menú lo alterna en ejecución).
     public bool Envoltorio { get; set; } = true;
+    // PrepararEnLote = true: ComandosPreparar se envía como UNA sola cadena, al estilo "Batch Programming" del manual
+    // (cada comando termina en ";" salvo BATCHST). false: un comando por escritura, con PausaEntreComandosMs. La opción 39
+    // del menú lo alterna en ejecución. ComandosActivar/Desactivar siempre van aparte.
+    public bool PrepararEnLote { get; set; } = true;
     // Bloque de luz: S0C0400 = encendida solo mientras lee (S0C0800 fija, S0C0C00 parpadeo, S0C0000 apagada).
     // Se envía antes de ComandosActivar; vaciarlo para probar si basta configurarlo una sola vez.
     public List<string> ComandosPreparar { get; set; } = new()

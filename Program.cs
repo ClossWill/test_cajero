@@ -63,6 +63,7 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
         ("32", "Secuencia activar/desactivar (comandos del proveedor; solo Qr.Modo = Serial)", HardwareTests.Test_ProbarComandosQr),
         ("37", "Comando manual: activar lectura, Enter para detenerla (solo Qr.Modo = Serial)", HardwareTests.Test_ComandoManualQr),
         ("38", "Alternar envoltorio de comandos: con $>:...<$ / sin él (en memoria)", HardwareTests.Test_AlternarEnvoltorioQr),
+        ("39", "Alternar bloque de luz: una sola cadena en lote / comandos separados (en memoria)", HardwareTests.Test_AlternarLoteQr),
     }),
     ("LEDs", new (string Clave, string Texto, Action Accion)[]
     {
