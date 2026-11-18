@@ -61,6 +61,7 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
         ("31", "Ping (detecta el COM virtual del lector y abre el puerto)", HardwareTests.Test_PingQr),
         ("30", "Iniciar lectura (guarda la luz, reinicia el lector y queda leyendo; cada QR sale por consola)", HardwareTests.Test_IniciarQr),
         ("32", "Detener lectura (apaga la luz, detiene el lector y cierra el puerto)", HardwareTests.Test_DetenerQr),
+        ("37", "Leer un QR (inicia, espera la primera lectura y detiene solo; Enter cancela)", HardwareTests.Test_LeerUnQr),
     }),
     ("LEDs", new (string Clave, string Texto, Action Accion)[]
     {

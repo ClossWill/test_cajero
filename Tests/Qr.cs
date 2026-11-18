@@ -73,6 +73,47 @@ public static partial class HardwareTests
             Consola.Info("El lector se reinicia al apagar la luz: el COM tarda unos segundos en volver antes de iniciar otra vez.");
     }
 
+    // Iniciar + espera de la primera lectura + Detener, en una sola prueba. Detener corre siempre (también si vence el
+    // tiempo, el operador pulsa Enter o algo falla), así el lector no queda leyendo. Detener tarda unos segundos (apaga la luz
+    // antes de mandar SWFFFFF), y en ese lapso la lectura continua puede repetir el QR: el total sale en el mensaje final.
+    public static void Test_LeerUnQr()
+    {
+        var r = new Reporte($"Lector QR XZG004 - Leer un QR (inicia, espera la primera lectura y detiene) [luz {DescribirLuzQr(Qr.Luz)}]");
+        if (LectorQr.Activo)
+        {
+            r.Criterio("Sin lectura previa en curso", false, "Ya hay una lectura iniciada: use \"Detener lectura\" y vuelva a intentar.");
+            r.Finalizar();
+            return;
+        }
+
+        Consola.Info("Guardar la luz reinicia el lector: el COM desaparece unos segundos y vuelve. Espere...");
+        var inicio = LectorQr.Iniciar(Qr.Puerto, Qr.BaudRate, Qr.Luz);
+        if (!r.Criterio("Lectura continua iniciada (SW00001 con ACK)", inicio.Ok, inicio.Mensaje))
+        {
+            r.Finalizar();
+            return;
+        }
+
+        Consola.Aviso($"Presente un QR frente al cristal (máximo {Qr.TimeoutSegundos} s; Enter cancela).");
+        string? dato = null;
+        ResultadoQr parada;
+        try
+        {
+            dato = LectorQr.EsperarPrimeraLectura(TimeSpan.FromSeconds(Qr.TimeoutSegundos),
+                () => !(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Enter));
+        }
+        finally
+        {
+            Consola.Info(dato is null ? "Sin lectura: deteniendo el lector..." : "QR detectado: deteniendo el lector...");
+            parada = LectorQr.Detener();
+        }
+
+        r.Criterio($"QR leído en {Qr.TimeoutSegundos} s", dato is not null,
+            dato is null ? null : $"Contenido: {dato}  ({dato.Length} caracteres)");
+        r.Criterio("Lectura detenida y puerto cerrado", parada.Ok, parada.Mensaje);
+        r.Finalizar();
+    }
+
     // Al salir del menú: el lector no debe quedar leyendo ni con el puerto tomado.
     public static void CerrarQr()
     {

@@ -86,7 +86,8 @@
     // Los comandos (luz, SW00001, SWFFFFF) los envía XzgLector igual que el ejemplo del proveedor.
     "Puerto": "COM15",  // vacío = buscar el COM virtual por VID_26F1 PID_D001
     "BaudRate": 115200, // 8N1; por defecto según el proveedor
-    "Luz": 2            // 1 = parpadeo, 2 = siempre encendida, 3 = encendida solo al leer (se guarda al iniciar y el lector se reinicia)
+    "Luz": 2,           // 1 = parpadeo, 2 = siempre encendida, 3 = encendida solo al leer (se guarda al iniciar y el lector se reinicia)
+    "TimeoutSegundos": 30 // "Leer un QR": espera máxima a la primera lectura antes de detener
   },
   "Camara": {
     // Item 12 del BEEX (GDZS-DC004-MG3021): webcam USB estándar, sin SDK propio.

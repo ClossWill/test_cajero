@@ -177,4 +177,5 @@ public sealed class QrConfig
     // Luz del lector mientras lee (se guarda al iniciar y el lector se reinicia): 1 = parpadeo, 2 = siempre encendida,
     // 3 = encendida solo al leer. 2 es el valor por defecto del ejemplo.
     public int Luz { get; set; } = 2;
+    public int TimeoutSegundos { get; set; } = 30;         // "Leer un QR": espera máxima a la primera lectura antes de detener
 }

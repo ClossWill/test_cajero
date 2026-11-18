@@ -22,6 +22,9 @@ public sealed class XzgLector : IDisposable
     private Hilo? _hilo;
     private bool _liberado;
     private int _lecturas;
+    private TaskCompletionSource<string> _primeraLectura = NuevaPrimeraLectura();
+
+    private static TaskCompletionSource<string> NuevaPrimeraLectura() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public bool Activo { get { lock (_operacion) return _hilo?.Subproceso.IsAlive == true; } }
 
@@ -40,6 +43,18 @@ public sealed class XzgLector : IDisposable
             Cerrar(); // un arranque a medias no debe dejar el puerto tomado
             return new ResultadoQr(false, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Espera el primer QR leído desde el último Iniciar. Devuelve null si vence <paramref name="limite"/> o si
+    /// <paramref name="continuar"/> devuelve false (p. ej. el operador cancela). No detiene la lectura: eso lo hace Detener.
+    /// </summary>
+    public string? EsperarPrimeraLectura(TimeSpan limite, Func<bool> continuar)
+    {
+        var tarea = _primeraLectura.Task;
+        var fin = DateTime.UtcNow + limite;
+        while (!tarea.IsCompleted && DateTime.UtcNow < fin && continuar()) Thread.Sleep(50);
+        return tarea.IsCompletedSuccessfully ? tarea.Result : null;
     }
 
     public ResultadoQr Detener()
@@ -84,6 +99,7 @@ public sealed class XzgLector : IDisposable
         };
 
         Interlocked.Exchange(ref _lecturas, 0);
+        _primeraLectura = NuevaPrimeraLectura();
         Abrir(puerto, baudRate);
         var resultadoLuz = Ejecutar("luz", modo);
         // Guardar la luz reinicia el módulo: se cierra, se espera a que el COM vuelva y se reabre antes de leer.
@@ -293,6 +309,7 @@ public sealed class XzgLector : IDisposable
     private void Recordar(string texto)
     {
         Interlocked.Increment(ref _lecturas);
+        _primeraLectura.TrySetResult(texto);
         Consola.Ok($"[{DateTime.Now:HH:mm:ss.fff}] QR: {texto}  ({texto.Length} caracteres)");
     }
 
