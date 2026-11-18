@@ -81,27 +81,12 @@
     "BarrerTodosLosCanales": false // true = recorre los 18 canales (18 min) para re-explorar
   },
   "Qr": {
-    // XZG004 (item 10 BEEX). "Teclado" = HID-KBW, como llega de fábrica (en la máquina aparece como HID Keyboard VID_26F1&PID_D101).
-    // Modo "Serial" según "Command Mode Usage Instructions.pdf" (proveedor). Configuración previa del lector, en este
-    // orden, escaneando del "XZG Quick Setup Manual": "USB Virtual Serial Port" ($>:S0F0216.<$) y "Key Mode"
-    // (BATCHST, S01010F, S03001A, S030000, S01000F, BATCHET). No escanear otros códigos entre medio.
-    // Los comandos son ASCII literal, sin terminador. Se escriben sin envoltorio, como en el documento del proveedor.
-    // "Envoltorio": true los envía como $>:código.<$ ; false, el código tal cual (SW00001). No está confirmado cuál acepta
-    // el lector por serial: probar ambos (la opción 38 del menú alterna en ejecución).
-    "Modo": "Serial",   // pasado a USB CDC el 2026-11-04; el lector aparece como COM15
-    "Puerto": "COM15",
+    // XZG004 (item 10 BEEX) en USB CDC (COM virtual): pasado el 2026-11-04, el lector aparece como COM15. Requiere haber
+    // escaneado antes, del "XZG Quick Setup Manual", "USB Virtual Serial Port" ($>:S0F0216.<$) y "Key Mode".
+    // Los comandos (luz, SW00001, SWFFFFF) los envía XzgLector igual que el ejemplo del proveedor.
+    "Puerto": "COM15",  // vacío = buscar el COM virtual por VID_26F1 PID_D001
     "BaudRate": 115200, // 8N1; por defecto según el proveedor
-    // Bloque de luz (antes de activar): S0C0400 = luz encendida solo mientras lee. Vaciar para probar sin él.
-    "Envoltorio": true,
-    "Terminador": "Ninguno",   // Ninguno | CR | LF | CRLF (tras cada escritura); la opción 40 prueba las combinaciones
-    "PrepararEnLote": true,   // el bloque de luz va como una sola cadena con ';' (formato Batch Programming); false = comando por comando
-    "ComandosPreparar": [ "BATCHST", "S01010F", "S020029", "S010029", "S0C0400", "S01000F", "BATCHET" ],   // S020029 / S010029: tonos apagados (opcionales según el proveedor)
-    "ComandosActivar": [ "SW00001" ],      // inicia la lectura (continua)
-    "ComandosDesactivar": [ "SWFFFFF" ],   // detiene la lectura
-    "PausaEntreComandosMs": 50,
-    "TimeoutSegundos": 30,
-    "SilencioTramaMs": 100,
-    "SegundosPorComando": 5   // opción 32: segundos de observación tras activar y tras desactivar
+    "Luz": 2            // 1 = parpadeo, 2 = siempre encendida, 3 = encendida solo al leer (se guarda al iniciar y el lector se reinicia)
   },
   "Camara": {
     // Item 12 del BEEX (GDZS-DC004-MG3021): webcam USB estándar, sin SDK propio.

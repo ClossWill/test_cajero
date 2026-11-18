@@ -58,15 +58,9 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
     }),
     ("Lector QR", new (string Clave, string Texto, Action Accion)[]
     {
-        ("30", "Leer código QR (activa el lector solo durante la prueba)", HardwareTests.Test_LeerQr),
-        ("31", "Ping (abre el puerto; solo Qr.Modo = Serial)", HardwareTests.Test_PingQr),
-        ("32", "Secuencia activar/desactivar (comandos del proveedor; solo Qr.Modo = Serial)", HardwareTests.Test_ProbarComandosQr),
-        ("37", "Lectura manual con trama del proveedor: activa, muestra cada QR, Enter para detener (solo Qr.Modo = Serial)", HardwareTests.Test_ComandoManualQr),
-        ("38", "Alternar envoltorio de comandos: con $>:...<$ / sin él (en memoria)", HardwareTests.Test_AlternarEnvoltorioQr),
-        ("40", "Sondeo de formatos: velocidad x envoltorio x terminador (solo disparo/detención; observar la luz)", HardwareTests.Test_SondearFormatosQr),
-        ("41", "Sondeo con códigos del manual (S01010F, S0C0400, S01000F) x velocidad x envoltorio x terminador", HardwareTests.Test_SondearCodigosManualQr),
-        ("42", "Sondeo en LOTE (BATCHST;...;BATCHET en una cadena) x velocidad x envoltorio x terminador", HardwareTests.Test_SondearLoteQr),
-        ("39","Alternar bloque de luz: una sola cadena en lote / comandos separados (en memoria)", HardwareTests.Test_AlternarLoteQr),
+        ("31", "Ping (detecta el COM virtual del lector y abre el puerto)", HardwareTests.Test_PingQr),
+        ("30", "Iniciar lectura (guarda la luz, reinicia el lector y queda leyendo; cada QR sale por consola)", HardwareTests.Test_IniciarQr),
+        ("32", "Detener lectura (apaga la luz, detiene el lector y cierra el puerto)", HardwareTests.Test_DetenerQr),
     }),
     ("LEDs", new (string Clave, string Texto, Action Accion)[]
     {
@@ -127,6 +121,7 @@ while (true)
 }
 
 HardwareTests.CerrarRecicladora();
+HardwareTests.CerrarQr();
 
 static int PedirEntero(string pregunta, int porDefecto)
 {

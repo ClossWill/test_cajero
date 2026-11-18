@@ -30,6 +30,8 @@
     <PackageReference Include="OpenCvSharp4" Version="4.10.0.20241108" />
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.10.0.20241108" />
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+    <!-- Win32_PnPEntity: localiza el COM virtual del lector QR (XZG004) por VID/PID, como el ejemplo del proveedor. -->
+    <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

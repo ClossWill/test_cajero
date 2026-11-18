@@ -3,10 +3,10 @@ using System.Text;
 namespace IntegracionCajeroPruebas.Protocolos;
 
 /// <summary>
-/// Trama serie del lector XZG004, tomada del ejemplo del proveedor (referencias_integracion\QR\xzg-example):
-/// <c>02 + longitud (u16 LE) + datos + suma de los datos (u16 LE) + 03</c>. El módulo contesta a cada comando con
-/// ACK 0x05 o NAK 0x15 y, por cada trama que él manda, espera un ACK 0x05 del anfitrión. Lo escaneado llega como texto
-/// plano terminado en CR/LF (o tras un silencio); las líneas que empiezan con "$>:" son eco de comandos.
+/// Trama serie del lector XZG004, copiada del ejemplo del proveedor (referencias_integracion\QR\xzg-example\Xzg004\Protocol.cs,
+/// verificado en la máquina): <c>02 + longitud (u16 LE) + datos + suma de los datos (u16 LE) + 03</c>. El módulo contesta a cada
+/// comando con ACK 0x05 o NAK 0x15 y, por cada trama que él manda, espera un ACK 0x05 del anfitrión. Lo escaneado llega como
+/// texto plano terminado en CR/LF (o tras un silencio); las líneas que empiezan con "$>:" son eco de comandos.
 /// </summary>
 public static class XzgTrama
 {
@@ -23,11 +23,12 @@ public static class XzgTrama
 
     public static byte[] Codificar(ReadOnlySpan<byte> datos)
     {
+        var largo = (ushort)datos.Length;
         var suma = Suma(datos);
         var trama = new byte[datos.Length + 6];
         trama[0] = Stx;
-        trama[1] = (byte)(datos.Length & 0xFF);
-        trama[2] = (byte)(datos.Length >> 8);
+        trama[1] = (byte)(largo & 0xFF);
+        trama[2] = (byte)(largo >> 8);
         datos.CopyTo(trama.AsSpan(3));
         trama[3 + datos.Length] = (byte)(suma & 0xFF);
         trama[4 + datos.Length] = (byte)(suma >> 8);
@@ -48,49 +49,108 @@ public static class XzgTrama
         catch (DecoderFallbackException) { return Encoding.GetEncoding(936).GetString(bytes); }
     }
 
-    /// <summary>
-    /// Separa lo recibido (un tramo entre dos silencios de la línea) en acuses, tramas válidas y texto suelto (lo escaneado).
-    /// No guarda estado entre llamadas: una trama partida entre dos tramos se descarta.
-    /// </summary>
-    public static (List<bool> Acuses, List<byte[]> Tramas, List<string> Textos) Separar(ReadOnlySpan<byte> bytes)
+    private static bool EsBlanco(byte b) => b is 0 or (byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n' or 0x0B or 0x0C;
+}
+
+/// <summary>
+/// Separa lo que llega del lector en acuses (ACK/NAK), tramas válidas y texto suelto (lo escaneado). Guarda estado entre
+/// lecturas, así una trama partida entre dos lecturas se completa. Copia de <c>Parser</c> del ejemplo del proveedor.
+/// </summary>
+public sealed class XzgParser
+{
+    private enum Modo { Suelto, Trama }
+
+    private Modo _modo = Modo.Suelto;
+    private readonly List<byte> _trama = new();
+    private readonly List<byte> _texto = new();
+    private DateTime? _ultimoTexto;
+    private readonly Queue<bool> _acuses = new();
+    private readonly Queue<byte[]> _tramas = new();
+    private readonly Queue<string> _lecturas = new();
+
+    public void Agregar(ReadOnlySpan<byte> bytes)
     {
-        var acuses = new List<bool>();
-        var tramas = new List<byte[]>();
-        var textos = new List<string>();
-        var texto = new List<byte>();
-        var trama = new List<byte>();
-        var enTrama = false;
-
-        void CerrarTexto()
-        {
-            var t = Decodificar(texto.ToArray());
-            texto.Clear();
-            if (t.Length > 0 && !t.StartsWith("$>:", StringComparison.Ordinal)) textos.Add(t);
-        }
-
         foreach (var b in bytes)
         {
-            if (enTrama)
-            {
-                trama.Add(b);
-                if (trama.Count < 2) continue;
-                var largo = trama[0] | (trama[1] << 8);
-                if (largo > 4097) { enTrama = false; trama.Clear(); continue; }
-                if (trama.Count < largo + 5) continue;
-                var datos = trama.GetRange(2, largo).ToArray();
-                var suma = (ushort)(trama[2 + largo] | (trama[3 + largo] << 8));
-                if (trama[4 + largo] == Etx && suma == Suma(datos)) tramas.Add(datos);
-                enTrama = false;
-                trama.Clear();
-            }
-            else if (b == Stx && texto.Count == 0) enTrama = true;
-            else if ((b == Ack || b == Nak) && texto.Count == 0) acuses.Add(b == Ack);
-            else if (b is (byte)'\r' or (byte)'\n') { if (texto.Count > 0) CerrarTexto(); }
-            else texto.Add(b);
+            if (_modo == Modo.Suelto) EnSuelto(b);
+            else EnTrama(b);
         }
-        if (texto.Count > 0) CerrarTexto();
-        return (acuses, tramas, textos);
     }
 
-    private static bool EsBlanco(byte b) => b is 0 or (byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n' or 0x0B or 0x0C;
+    /// <summary>Cierra como lectura el texto pendiente si la línea lleva <paramref name="inactivo"/> sin recibir nada (el lector puede no mandar CR/LF).</summary>
+    public void CerrarPorInactividad(TimeSpan inactivo)
+    {
+        if (_ultimoTexto is { } desde && _texto.Count > 0 && DateTime.UtcNow - desde >= inactivo)
+            EmitirTexto();
+    }
+
+    public bool? TomarAcuse() => _acuses.Count == 0 ? null : _acuses.Dequeue();
+
+    public byte[]? TomarTrama() => _tramas.Count == 0 ? null : _tramas.Dequeue();
+
+    public string? TomarLectura() => _lecturas.Count == 0 ? null : _lecturas.Dequeue();
+
+    public void Reiniciar()
+    {
+        _modo = Modo.Suelto;
+        _trama.Clear();
+        _texto.Clear();
+        _ultimoTexto = null;
+        _acuses.Clear();
+        _tramas.Clear();
+        _lecturas.Clear();
+    }
+
+    private void EnSuelto(byte b)
+    {
+        if (b == XzgTrama.Stx && _texto.Count == 0)
+        {
+            _modo = Modo.Trama;
+            _trama.Clear();
+            return;
+        }
+        if (b == XzgTrama.Ack && _texto.Count == 0) { _acuses.Enqueue(true); return; }
+        if (b == XzgTrama.Nak && _texto.Count == 0) { _acuses.Enqueue(false); return; }
+        if (b is (byte)'\r' or (byte)'\n')
+        {
+            if (_texto.Count > 0) EmitirTexto();
+            return;
+        }
+        _texto.Add(b);
+        _ultimoTexto = DateTime.UtcNow;
+        if (_texto.Count > 8192) EmitirTexto();
+    }
+
+    private void EnTrama(byte b)
+    {
+        _trama.Add(b);
+        if (_trama.Count < 2) return;
+        var largo = _trama[0] | (_trama[1] << 8);
+        if (largo > 4097)
+        {
+            _modo = Modo.Suelto;
+            _trama.Clear();
+            return;
+        }
+        var total = 2 + largo + 2 + 1;
+        if (_trama.Count < total) return;
+        var datos = _trama.GetRange(2, largo).ToArray();
+        var suma = (ushort)(_trama[2 + largo] | (_trama[3 + largo] << 8));
+        var etx = _trama[4 + largo];
+        var resto = _trama.Count > total ? _trama.GetRange(total, _trama.Count - total).ToArray() : Array.Empty<byte>();
+        _modo = Modo.Suelto;
+        _trama.Clear();
+        if (etx == XzgTrama.Etx && suma == XzgTrama.Suma(datos)) _tramas.Enqueue(datos);
+        if (resto.Length > 0) Agregar(resto);
+    }
+
+    private void EmitirTexto()
+    {
+        var crudo = _texto.ToArray();
+        _texto.Clear();
+        _ultimoTexto = null;
+        var texto = XzgTrama.Decodificar(crudo);
+        if (texto.Length == 0 || texto.StartsWith("$>:", StringComparison.Ordinal)) return;
+        _lecturas.Enqueue(texto);
+    }
 }

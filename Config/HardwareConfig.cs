@@ -166,41 +166,15 @@ public sealed class CamaraConfig
     public string CarpetaCapturas { get; set; } = @"C:\Users\1\Pictures";
 }
 
-// Item 10 del BEEX (XZG004, manual "XZG004 EN Barcode User Manual V1.0"): lector 1D/2D. De fábrica en modo "Manual"
-// (Command + Button Trig): solo decodifica cuando recibe el disparo, no escanea solo. El manual documenta los códigos de
-// programación, pero NO el comando serial de disparo; por eso el comando es configurable y debe confirmarse con el fabricante.
+// Item 10 del BEEX (XZG004, manual "XZG004 EN Barcode User Manual V1.0"): lector 1D/2D en modo USB CDC (COM virtual). Los comandos
+// de luz y de lectura (SW00001 / SWFFFFF) son los del ejemplo del proveedor (referencias_integracion\QR\xzg-example) y van
+// fijos en XzgLector; aquí solo queda lo que cambia de una máquina a otra.
 public sealed class QrConfig
 {
-    // "Teclado" = HID-KBW (como llega de fábrica según el BEEX): el lector "teclea" el contenido en la consola; no hay
-    //             canal de comandos, así que la prueba solo abre una ventana de captura y descarta lo tecleado antes.
-    // "Serial"  = USB CDC o RS-232: la prueba envía ComandosPreparar y ComandosActivar, espera el dato y envía ComandosDesactivar.
-    public string Modo { get; set; } = "Teclado";
-    public string Puerto { get; set; } = "";               // solo Modo=Serial; el COM nuevo que aparece al pasar el lector a USB CDC
-    public int BaudRate { get; set; } = 115200;            // "Command Mode Usage Instructions" (proveedor): 115200 por defecto
-    // Comandos en ASCII literal, sin terminador. Se guardan SIN envoltorio, tal como los lista "Command Mode Usage
-    // Instructions.pdf" (proveedor). Cada lista se envía en orden, con PausaEntreComandosMs entre comandos. Vacía = no
-    // se envía nada.
-    // Envoltorio = true: cada código se envía como "$>:" + código + ".<$" (el formato de los códigos de programación del
-    // manual). false: se envía el código tal cual ("SW00001"). El documento no aclara cuál acepta el lector por serial,
-    // por eso es un interruptor (la opción 38 del menú lo alterna en ejecución).
-    public bool Envoltorio { get; set; } = true;
-    // PrepararEnLote = true: ComandosPreparar se envía como UNA sola cadena, al estilo "Batch Programming" del manual
-    // (cada comando termina en ";" salvo BATCHST). false: un comando por escritura, con PausaEntreComandosMs. La opción 39
-    // del menú lo alterna en ejecución. ComandosActivar/Desactivar siempre van aparte.
-    public bool PrepararEnLote { get; set; } = true;
-    // Terminador agregado tras cada escritura (cada comando o el lote completo): "Ninguno" | "CR" | "LF" | "CRLF". El
-    // documento del proveedor no indica ninguno; la opción 40 del menú prueba las combinaciones.
-    public string Terminador { get; set; } = "Ninguno";
-    // Bloque de luz: S0C0400 = encendida solo mientras lee (S0C0800 fija, S0C0C00 parpadeo, S0C0000 apagada).
-    // Se envía antes de ComandosActivar; vaciarlo para probar si basta configurarlo una sola vez.
-    public List<string> ComandosPreparar { get; set; } = new()
-    {
-        "BATCHST", "S01010F", "S020029", "S010029", "S0C0400", "S01000F", "BATCHET",   // S020029 / S010029: tonos apagados (opcionales)
-    };
-    public List<string> ComandosActivar { get; set; } = new() { "SW00001" };      // inicia la lectura (continua)
-    public List<string> ComandosDesactivar { get; set; } = new() { "SWFFFFF" };  // detiene la lectura; al terminar o vencer el tiempo
-    public int PausaEntreComandosMs { get; set; } = 50;    // el documento no indica pausa mínima entre comandos del bloque
-    public int TimeoutSegundos { get; set; } = 30;
-    public int SilencioTramaMs { get; set; } = 100;        // silencio que cierra el dato (el lector puede no mandar terminador)
-    public int SegundosPorComando { get; set; } = 5;       // Test_ProbarComandosQr: segundos de observación tras activar y tras desactivar
+    // COM virtual del lector. Vacío = buscarlo por VID_26F1 PID_D001, como hace el ejemplo del proveedor.
+    public string Puerto { get; set; } = "";
+    public int BaudRate { get; set; } = 115200;            // 8N1; fijo en el ejemplo del proveedor
+    // Luz del lector mientras lee (se guarda al iniciar y el lector se reinicia): 1 = parpadeo, 2 = siempre encendida,
+    // 3 = encendida solo al leer. 2 es el valor por defecto del ejemplo.
+    public int Luz { get; set; } = 2;
 }
