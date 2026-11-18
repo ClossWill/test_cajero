@@ -40,7 +40,7 @@
   },
   "Monederos": {
     "BaudRate": 9600,
-    "MaxMonedasPrueba": 10,
+    "MaxMonedasPrueba": 50,   // tope de monedas por hopper en cada dispensa; subido de 10 a 50
     "Hoppers": [
       { "Nombre": "MK4 #1 ($1 MXN)", "Denominacion": 1, "Puerto": "COM1", "Direccion": 3 },
       { "Nombre": "MK4 #2 ($5 MXN)", "Denominacion": 5, "Puerto": "COM1", "Direccion": 4 }

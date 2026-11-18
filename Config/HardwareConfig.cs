@@ -95,7 +95,7 @@ public sealed class HopperConfig
 public sealed class MonederosConfig
 {
     public int BaudRate { get; set; } = 9600;
-    public int MaxMonedasPrueba { get; set; } = 10;
+    public int MaxMonedasPrueba { get; set; } = 50;
     // Puerto y direcciones confirmados en la máquina real (2026-10-16) con el software oficial SCH2 y luego
     // con Test_PingMonederos: COM1, no COM3 (el COM3 original era un supuesto nunca verificado). COM1 es de
     // la tarjeta serial multi-puerto interna (ACPI\PNP0501), no del adaptador USB CP210x (ese es COM13/14,
