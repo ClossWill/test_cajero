@@ -46,7 +46,7 @@ public sealed class RecicladoraConfig
     public byte TipoDispensa { get; set; } = 1;
     public byte DestinoRechazoDispensa { get; set; } = 1;   // byRejectToAc: 1 = AC1, 2 = AC2, 3 = LRB
     public byte DestinoRechazoDeposito { get; set; } = 1;   // byRejectPos: 1 = AC1, 2 = AC2, 3 = LRB
-    public int MaxBilletesPrueba { get; set; } = 5;
+    public int MaxBilletesPrueba { get; set; } = 20;
     public int SegundosRetiroBilletes { get; set; } = 60;   // espera a que retiren lo dispensado antes de cerrar el shutter
     public int SegundosColocarBilletes { get; set; } = 60;  // depósito: espera a que coloquen billetes tras abrir el shutter
     public int SegundosAcomodoBilletes { get; set; } = 3;   // depósito: margen tras detectar billetes para que terminen de acomodarlos

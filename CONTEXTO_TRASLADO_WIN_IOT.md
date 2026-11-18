@@ -132,4 +132,4 @@ Criterios de aceptación completos (R-01..R-15): `Docs/Prueba_Dia1_Recicladora.m
 - Una orden de dispensa no equivale a entrega física (TAC): las pruebas imprimen contadores por casete y piden confirmación humana.
 - Para probar el menú sin teclado desde PowerShell, el BOM de la tubería rompe la primera opción; usar `printf '1\n0\n' | ./FinsoHardwareTests.exe` desde bash.
 - `Docs/*.md` se generan desde las plantillas de `Docs/_plantillas/` (marcadores `{{CODE:ruta}}`). Si cambia el código, editar la plantilla y regenerar con `powershell -NoProfile -File Docs\_plantillas\regenerar.ps1`. No editar los `.md` generados a mano: se pisan.
-- Ingresar billetes reales o dispensar: empezar siempre con 1 unidad; `MaxBilletesPrueba` (5) y `MaxMonedasPrueba` (10) limitan por seguridad.
+- Ingresar billetes reales o dispensar: empezar siempre con 1 unidad; `MaxBilletesPrueba` (20) y `MaxMonedasPrueba` (10) limitan por seguridad.
