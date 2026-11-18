@@ -53,9 +53,10 @@ public static partial class HardwareTests
         r.Finalizar();
     }
 
-    // Envío manual de los comandos del proveedor: bloque de luz + inicio de lectura, espera a que el operador pulse Enter
-    // (observar el lector, y si se quiere escanear un QR, el dato aparece en pantalla) y detención. Sin timeout: la
-    // detención siempre se envía al salir.
+    // Lectura manual con el protocolo del ejemplo del proveedor (ver XzgTrama): cada comando va dentro de una trama
+    // 02+longitud+datos+suma+03 y el ACK es 0x05. Inicia la lectura continua (SW00001), muestra cada QR que se presente
+    // hasta que el operador pulse Enter y la detiene (SWFFFFF, siempre, también si algo falla). La luz es opcional: guardarla
+    // REINICIA el lector (el COM desaparece unos segundos), así que se pregunta; basta hacerlo una vez. Sin timeout.
     public static void Test_ComandoManualQr()
     {
         if (!QrEsSerial)
@@ -70,27 +71,93 @@ public static partial class HardwareTests
             return;
         }
 
-        Consola.Titulo($"Lector QR XZG004 - Comando manual en {Qr.Puerto} @ {Qr.BaudRate}");
+        Consola.Titulo($"Lector QR XZG004 - Lectura manual en {Qr.Puerto} @ {Qr.BaudRate}");
+        SerialPort? puerto = null;
         try
         {
-            using var puerto = AbrirPuertoQr();
+            puerto = AbrirPuertoQr();
+            if (Qr.ComandosPreparar.Count > 0 &&
+                Consola.Confirmar("¿Guardar primero la configuración de luz? (el lector se REINICIA; solo hace falta la primera vez)"))
+                puerto = ConfigurarLuzQr(puerto);
+
             puerto.DiscardInBuffer();
             try
             {
-                EnviarPrepararQr(puerto);
-                EnviarComandosQr(puerto, Qr.ComandosActivar);
-                Consola.Info("Presente un QR si desea; Enter para detener la lectura y terminar.");
+                foreach (var comando in Qr.ComandosActivar) EnviarTramaQr(puerto, comando);
+                Consola.Aviso("Presente un QR frente al cristal; Enter para detener la lectura y terminar.");
 
                 SerialTramas.Escuchar(puerto, Qr.SilencioTramaMs,
                     () => !(Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Enter),
-                    trama => Consola.Ok($"[{DateTime.Now:HH:mm:ss.fff}] RX: {DescribirRxQr(trama)}"));
+                    rx => ProcesarRxQr(puerto, rx));
             }
             finally
             {
-                EnviarComandosQr(puerto, Qr.ComandosDesactivar);
+                foreach (var comando in Qr.ComandosDesactivar) EnviarTramaQr(puerto, comando);
             }
         }
         catch (Exception ex) { Consola.Error($"Excepción: {ex.Message}"); }
+        finally { puerto?.Dispose(); }
+    }
+
+    // Guarda el bloque de luz (ComandosPreparar, en lote con "$>:código.<$" y ";" salvo tras BATCHST) en UNA trama, espera el
+    // ACK y reabre el puerto: al cerrar el bloque el módulo se reinicia y el COM virtual desaparece y vuelve (hasta 15 s).
+    private static SerialPort ConfigurarLuzQr(SerialPort puerto)
+    {
+        var lote = string.Concat(Qr.ComandosPreparar.Where(c => !string.IsNullOrEmpty(c)).Select(c =>
+            $"$>:{c}.<${(c.Equals("BATCHST", StringComparison.OrdinalIgnoreCase) ? "" : ";")}"));
+        EnviarTramaQr(puerto, lote);
+
+        Consola.Info("  >> Esperando a que el lector se reinicie y vuelva el puerto...");
+        puerto.Dispose();
+        Thread.Sleep(1500);
+        var limite = DateTime.UtcNow.AddSeconds(15);
+        while (!SerialPort.GetPortNames().Contains(Qr.Puerto, StringComparer.OrdinalIgnoreCase))
+        {
+            if (DateTime.UtcNow > limite)
+                throw new TimeoutException($"{Qr.Puerto} no volvió tras el reinicio del lector.");
+            Thread.Sleep(400);
+        }
+        Thread.Sleep(800);
+        return AbrirPuertoQr();
+    }
+
+    // Un comando ASCII dentro de su trama; espera hasta 1.2 s el ACK (0x05) o NAK (0x15) y muestra todo lo que llegue.
+    private static bool? EnviarTramaQr(SerialPort puerto, string comando)
+    {
+        var trama = XzgTrama.Codificar(Encoding.ASCII.GetBytes(comando));
+        puerto.Write(trama, 0, trama.Length);
+        Consola.Paso($"[{DateTime.Now:HH:mm:ss.fff}] TX: {comando}  ({trama.Length} bytes: {Consola.Hex(trama)})");
+
+        bool? acuse = null;
+        var limite = DateTime.UtcNow.AddMilliseconds(1200);
+        while (acuse is null && DateTime.UtcNow < limite)
+        {
+            Thread.Sleep(20);
+            if (puerto.BytesToRead == 0) continue;
+            var rx = new byte[puerto.BytesToRead];
+            var n = puerto.Read(rx, 0, rx.Length);
+            acuse = ProcesarRxQr(puerto, rx[..n]);
+        }
+        if (acuse is null) Consola.Aviso("      (sin ACK ni NAK)");
+        return acuse;
+    }
+
+    // Muestra lo recibido: acuses, tramas (se contestan con ACK, como pide el módulo) y texto suelto, que es el QR leído.
+    // Devuelve el último acuse visto, si hubo.
+    private static bool? ProcesarRxQr(SerialPort puerto, byte[] rx)
+    {
+        var (acuses, tramas, textos) = XzgTrama.Separar(rx);
+        foreach (var acuse in acuses)
+            Consola.Info($"      RX: {(acuse ? "ACK (05)" : "NAK (15)")}");
+        foreach (var datos in tramas)
+        {
+            puerto.Write(new[] { XzgTrama.Ack }, 0, 1);
+            var texto = XzgTrama.Decodificar(datos);
+            if (texto.Length > 0) Consola.Ok($"[{DateTime.Now:HH:mm:ss.fff}] QR (en trama): {texto}");
+        }
+        foreach (var texto in textos)
+            Consola.Ok($"[{DateTime.Now:HH:mm:ss.fff}] QR: {texto}  ({texto.Length} caracteres)");
+        return acuses.Count > 0 ? acuses[^1] : null;
     }
 
     // Secuencia de observación: bloque de luz + inicio de lectura, SegundosPorComando mirando el lector (y lo que

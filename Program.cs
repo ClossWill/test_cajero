@@ -61,7 +61,7 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
         ("30", "Leer código QR (activa el lector solo durante la prueba)", HardwareTests.Test_LeerQr),
         ("31", "Ping (abre el puerto; solo Qr.Modo = Serial)", HardwareTests.Test_PingQr),
         ("32", "Secuencia activar/desactivar (comandos del proveedor; solo Qr.Modo = Serial)", HardwareTests.Test_ProbarComandosQr),
-        ("37", "Comando manual: activar lectura, Enter para detenerla (solo Qr.Modo = Serial)", HardwareTests.Test_ComandoManualQr),
+        ("37", "Lectura manual con trama del proveedor: activa, muestra cada QR, Enter para detener (solo Qr.Modo = Serial)", HardwareTests.Test_ComandoManualQr),
         ("38", "Alternar envoltorio de comandos: con $>:...<$ / sin él (en memoria)", HardwareTests.Test_AlternarEnvoltorioQr),
         ("40", "Sondeo de formatos: velocidad x envoltorio x terminador (solo disparo/detención; observar la luz)", HardwareTests.Test_SondearFormatosQr),
         ("41", "Sondeo con códigos del manual (S01010F, S0C0400, S01000F) x velocidad x envoltorio x terminador", HardwareTests.Test_SondearCodigosManualQr),
