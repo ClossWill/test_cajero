@@ -27,6 +27,8 @@ var categorias = new (string Nombre, (string Clave, string Texto, Action Accion)
         ("23", "Depositar dólares USD (mismo flujo, solo acepta USD)", () => HardwareTests.Test_DepositarBilletes("USD")),
         ("3", "Dispensar pesos MXN",      () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa("MXN"))),
         ("24", "Dispensar dólares USD",   () => HardwareTests.Test_DispensarBilletes(PedirPedidoDispensa("USD"))),
+        ("38", "[Experimental] Dispensar pesos MXN; si falta, recoger a los RC (RETRACT_POS_RC) y no al AC", () => HardwareTests.Test_DispensarBilletesRetractoARc(PedirPedidoDispensa("MXN"))),
+        ("39", "[Experimental] Dispensar dólares USD; si falta, recoger a los RC (RETRACT_POS_RC) y no al AC", () => HardwareTests.Test_DispensarBilletesRetractoARc(PedirPedidoDispensa("USD"))),
         ("20", "Abrir shutter (control manual)",    HardwareTests.Test_AbrirShutter),
         ("21", "Cerrar shutter (control manual)",   HardwareTests.Test_CerrarShutter),
         ("22", "Estado de casetes (presencia/status, solo lectura)", HardwareTests.Test_ConsultarEstadoCasetes),

@@ -337,6 +337,7 @@ public static partial class HardwareTests
 
             if (!AsegurarRecicladora(r)) { r.Finalizar(); return; }
             if (!HayBilletesParaDispensar(renglones)) { r.Finalizar(); return; }
+            if (_destinoRetractPrueba is not null) MostrarEstadoUnidadesPrueba("ANTES de dispensar");
             Consola.Aviso($"  >> El dispositivo recibió la orden: dispensar {resumen} y abrir el shutter");
 
             // Flujo recomendado por GRG (PDF §5.2): iPrepareNextTransaction -> iDispenseEx -> si falla, iInitEx hasta
@@ -408,6 +409,82 @@ public static partial class HardwareTests
         }
         catch (Exception ex) { r.Criterio("Ejecución sin excepciones", false, ex.Message); }
         r.Finalizar();
+    }
+
+    // Destino de iRetractEx que se usa SOLO durante Test_DispensarBilletesRetractoARc (null = el de hardware.json, flujo de siempre).
+    private static byte? _destinoRetractPrueba;
+
+    /// <summary>
+    /// Prueba experimental: igual que <see cref="Test_DispensarBilletes"/>, pero los billetes que queden en NF/NE tras una falla se
+    /// recogen con <c>byRetractPos = 5</c> (RETRACT_POS_RC: de vuelta a los casetes de reciclaje, lo no calificado va al AC) en lugar del
+    /// destino de hardware.json (hoy 2 = AC, el casete azul). Sirve para ver si, al pedir más de lo que hay, los billetes extraídos
+    /// regresan a su casete de origen. No modifica hardware.json ni el flujo de las demás opciones.
+    /// Receta: depositar pocos billetes (p. ej. 3 de MXN 100 con el casete vacío), pedir más (p. ej. 10) y revisar con la opción 22
+    /// y abriendo los casetes dónde quedaron.
+    /// </summary>
+    public static void Test_DispensarBilletesRetractoARc(params (string Moneda, int Denominacion, int Cantidad)[] pedido)
+    {
+        _destinoRetractPrueba = RetractPosRc;
+        try
+        {
+            Consola.Aviso($"  >> PRUEBA EXPERIMENTAL: lo que quede en NF/NE se recogerá con destino {RetractPosRc} (RETRACT_POS_RC) " +
+                          $"en vez del destino {Crm.DestinoRetract} de hardware.json.");
+            Test_DispensarBilletes(pedido);
+        }
+        finally { _destinoRetractPrueba = null; }
+    }
+
+    private const byte RetractPosRc = 5; // eCRM9250N_RetractPos.RETRACT_POS_RC (PDF §3.16)
+
+    // Solo para la prueba experimental: estado de cada casete RC configurado y de las cajas AC (iGetCassetteInfoEx, sin movimiento).
+    private static void MostrarEstadoUnidadesPrueba(string momento)
+    {
+        using var s = new NativeScope();
+        var pStatus = s.Salida<tDevReturn>();
+        var pCasetes = s.Salida<tCRM9250N_CassetteInfoEx>();
+        var pEstado = s.Salida<tCRM9250N_CassetteStatusEx>();
+        var rc = Crm9250NExtra.iGetCassetteInfoEx(_crm, pCasetes, pEstado, pStatus);
+        if (rc != Crm.CodigoExito)
+        {
+            Consola.Aviso($"        [Prueba RC] No se pudo leer el estado de los casetes {momento} (rc={rc}).");
+            return;
+        }
+        var estado = Native.Leer<tCRM9250N_CassetteStatusEx>(pEstado);
+        Consola.Info($"        [Prueba RC] Estado de unidades {momento} (status: 0 normal, 3 casi vacío, 4 vacío):");
+        foreach (var cassette in Crm.Casetes.OrderBy(c => c.Indice))
+        {
+            var idx = cassette.Indice - 1;
+            if (idx < 0 || idx >= estado.asRcStatus.Length) continue;
+            Consola.Info($"          RC{cassette.Indice} {cassette.Nombre} ({cassette.Moneda} {cassette.Denominacion}): " +
+                         $"presente={estado.asRcStatus[idx].byExist} status={estado.asRcStatus[idx].byStatus}");
+        }
+        for (var i = 0; i < estado.sAcStatus.Length; i++)
+            if (estado.sAcStatus[i].byExist != 0)
+                Consola.Info($"          AC{i + 1} (caja de rechazos): status={estado.sAcStatus[i].byStatus}");
+    }
+
+    // Solo para la prueba experimental: a qué unidades fueron los billetes recogidos por iRetractEx (sInOutUnitsInfo) y de qué denominación.
+    private static void ImprimirDestinoRetract(tCRM9250N_RetractInfoEx res, byte destino)
+    {
+        var u = res.sInOutUnitsInfo;
+        Consola.Info($"        [Prueba RC] Destino real de lo recogido (iRetractEx destino={destino}, iTotalCount={res.iTotalCount}):");
+        var hubo = false;
+        for (var i = 0; i < u.aiRcInOutNum.Length; i++)
+        {
+            if (u.aiRcInOutNum[i] == 0) continue;
+            hubo = true;
+            var cfg = Crm.Casetes.FirstOrDefault(c => c.Indice == i + 1);
+            var detalle = cfg is null ? "sin entrada en hardware.json" : $"{cfg.Nombre} ({cfg.Moneda} {cfg.Denominacion})";
+            Consola.Info($"          -> RC{i + 1} {detalle}: {u.aiRcInOutNum[i]} billete(s)");
+        }
+        for (var i = 0; i < u.iAcInOutNum.Length; i++)
+            if (u.iAcInOutNum[i] != 0) { hubo = true; Consola.Info($"          -> AC{i + 1} (casete azul): {u.iAcInOutNum[i]} billete(s)"); }
+        if (u.iLrbInOutNum != 0) { hubo = true; Consola.Info($"          -> LRB: {u.iLrbInOutNum} billete(s)"); }
+        if (u.iAtcInOutNum != 0) { hubo = true; Consola.Info($"          -> ATC: {u.iAtcInOutNum} billete(s)"); }
+        if (u.iNeInOutNum != 0) { hubo = true; Consola.Info($"          -> NE (escrow): {u.iNeInOutNum} billete(s)"); }
+        if (u.iNfInOutNum != 0) { hubo = true; Consola.Info($"          -> NF (ranura): {u.iNfInOutNum} billete(s)"); }
+        if (!hubo) Consola.Aviso("          El SDK no reportó destino por unidad (puede ser inexacto): verificar abriendo los casetes.");
+        ImprimirDenominaciones(res.sDenomNumInfo);
     }
 
     /// <summary>Control manual del shutter, independiente del flujo de aceptar/dispensar. Sirve para diagnosticar
@@ -895,13 +972,19 @@ public static partial class HardwareTests
             if (!hay) continue;
             var ret = Native.Cero<tCRM9250N_RetractInfoEx>();
             ret.byRetractType = tipo;
-            ret.byRetractPos = Crm.DestinoRetract;
+            var destino = _destinoRetractPrueba ?? Crm.DestinoRetract; // null salvo en la prueba experimental (opciones 38/39)
+            ret.byRetractPos = destino;
             for (var i = 0; i < 4; i++) ret.abyCassettePriority[i] = (byte)(i + 1);
             var pRet = s.Entrada(ret);
-            Paso($"iRetractEx: recoger billetes de {zona} (destino {Crm.DestinoRetract})");
+            Paso($"iRetractEx: recoger billetes de {zona} (destino {destino})");
             if (CrmOk(r, $"iRetractEx {zona}", CRM9250N.iRetractEx(_crm, pRet, pStatus), pStatus))
-                Consola.Info($"        Recogidos de {zona}: {Native.Leer<tCRM9250N_RetractInfoEx>(pRet).iTotalCount} billete(s) (conteo aproximado según SDK)");
+            {
+                var recogido = Native.Leer<tCRM9250N_RetractInfoEx>(pRet);
+                Consola.Info($"        Recogidos de {zona}: {recogido.iTotalCount} billete(s) (conteo aproximado según SDK)");
+                if (_destinoRetractPrueba is not null) ImprimirDestinoRetract(recogido, destino);
+            }
         }
+        if (_destinoRetractPrueba is not null) MostrarEstadoUnidadesPrueba("DESPUÉS de recoger");
     }
 
     private static void LlenarDenominacionesAceptadas(ushort[] destino, string? moneda = null)
